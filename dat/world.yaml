@@ -1,0 +1,104 @@
+Materials:
+    - stone
+    - wood
+    - flesh
+    - soil
+
+    # todo,
+    - liquid
+    - iron
+    - sand
+    - clay
+    - veggie
+
+Where:
+    # descending top-down occlusion order
+    - unattached
+    - planted
+    - floor
+    - buried
+
+WorldGen:
+        stone:
+            name: stone
+            char: '#'
+            material: stone
+            weight_range:
+                - 2000
+                - 3000
+            where: buried
+            color: white
+
+        soil:
+            name: soil
+            char: '.'
+            material: soil
+            weight_range: 
+                - 5
+                - 400
+            where: floor
+            color: bold_black
+
+        tree:
+            name: tree
+            char: 'o'
+            material: wood
+            weight_range: 
+                - 50
+                - 2500
+            where: planted
+            color: yellow
+
+        # todo,
+        water:
+            name: water
+            char: '≈'
+            material: liquid
+            weight_range:
+                 - 3
+                 - 4000
+            where: unattached
+            color: blue
+
+        boulder:
+            name: boulder
+            char: '0'
+            material: stone
+            weight_range:
+                 - 1500
+                 - 2500
+            where: floor
+            color: white
+
+        clay:
+            name: clay
+            char: '%'
+            material: clay
+            weight_range:
+                 - 1500
+                 - 2500
+            where: floor
+            color: red
+
+        sapling:
+            name: sapling
+            char: '◦'
+            material: wood
+            weight_range:
+                 - 0.3
+                 - 45
+            where: planted
+            color: green
+
+        player:
+            name: player
+            char: '@'
+            material: flesh
+            weight_range:
+                 - 50
+                 - 100
+            where: unattached
+            color: bold_white
+
+Difficulty:
+    trees_pct: 5
