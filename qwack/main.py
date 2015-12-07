@@ -3,6 +3,7 @@ import contextlib
 import functools
 import random
 import enum
+import time
 
 import blessed
 import yaml
@@ -25,29 +26,37 @@ Position = collections.namedtuple('Position', (
 
 class Item(object):
     def __init__(self, pos, char, name, material, weight, where, color):
-        self.pos = pos
         self.char = char
         self.name = name
         self.material = material
         self.weight = weight
         self.where = where
         self.color = color
+        self._pos = pos
+
+    @property
+    def pos(self):
+        return self._pos
+
+    @pos.setter
+    def pos(self, value):
+        self._pos = value
 
     @property
     def z(self):
-        return self.pos.z
+        return self._pos.z
 
     @property
     def y(self):
-        return self.pos.y
+        return self._pos.y
 
     @property
     def x(self):
-        return self.pos.x
+        return self._pos.x
 
     def __repr__(self):
         return ('{self.name}<{self.where} {self.material} at '
-                '{self.pos.z},{self.pos.y},{self.pos.x}>'
+                '{self.z},{self.y},{self.x}>'
                 .format(self=self))
 
     @classmethod
@@ -65,21 +74,73 @@ class Item(object):
                           color='bold_black')
 
 
-class World(object):
-    z_bedrock = 2  # will be ~200 for sequoia trees later ..
+class WorldTime(object):
+    #: number and name of seasons
+    seasons = ('winter', 'spring', 'summer', 'fall',)
 
-    time = 4.50 # begin at 4:30am
-    TICK = 0.1
+    #: number of days for each season
+    days_per_season = 100
+
+    #: number and name of parts of the day
+    hours = ('midnight', 'before dawn', 'dawn', 'early morning',
+             'morning', 'late morning', 'afternoon',
+             'late afternoon', 'early evening', 'evening',
+             'late evening', 'dusk', 'night', 'late night',)
+
+    #: number of 'ticks' per part of each day.
+    ticks_per_hour = 100
+
+    def __init__(self, tick=0):
+        self._tick = tick
+
+    @property
+    def value(self):
+        return self._tick
+
+    def advance(self):
+        self._tick += 1
+
+    @property
+    def values(self):
+        hours, seconds = divmod(self.value, self.ticks_per_hour)
+        days, hour = divmod(hours, len(self.hours))
+        seasons, day = divmod(days, self.days_per_season)
+        year, season = divmod(seasons, len(self.seasons))
+
+        return {
+            'seconds': seconds,
+            'hour': hour,
+            'day': day,
+            'season': season,
+            'year': year,
+        }
+
+    @property
+    def hour(self):
+        return self.hours[self.values['hour']]
+
+    @property
+    def season(self):
+        return self.seasons[self.values['season']]
+
+    def __str__(self):
+        return ('{self.hour} on the {self.values[day]} day of '
+                '{self.season} in year {self.values[year]}'
+                .format(self=self))
+
+
+class World(object):
 
     def __init__(self, Materials, Where, items):
         self.Where = Where
         self.Materials = Materials
         self.items = items
+        self.time = WorldTime()
 
         # bounding dimensions
-        self._height = max(item.pos.y for item in items)
-        self._width = max(item.pos.x for item in items)
-        self._depth = max(item.pos.z for item in items)
+        self._height = max(item.y for item in items)
+        self._width = max(item.x for item in items)
+        self._depth = max(item.z for item in items)
 
         # cache lookup
         self._player = None
@@ -132,11 +193,10 @@ class World(object):
         coords = [(row, col) for row in range(height) for col in range(width)]
 
         # lay "bedrock", then soil, plant trees.
-        z = cls.z_bedrock
-        items.extend(cls._make_zlayer(z+2, coords, worldgen['stone']))
-        items.extend(cls._make_zlayer(z+1, coords, worldgen['stone']))
-        items.extend(cls._make_zlayer(z, coords, worldgen['soil']))
-        items.extend(cls._make_zlayer(z, coords, worldgen['tree'], 14))
+        z = 2  # will be ~200 for sequoia trees later ..
+        items.extend(cls._make_zlayer(z, coords, worldgen['stone']))
+        items.extend(cls._make_zlayer(z - 1, coords, worldgen['soil']))
+        items.extend(cls._make_zlayer(z - 1, coords, worldgen['tree'], 12))
         items.append(Item.create(
             pos=Position(z, *random.choice(coords)),
             **worldgen['player']))
@@ -155,9 +215,9 @@ class World(object):
         return result
 
     def do_move_player(self, y=0, x=0, z=0):
-        pos = Position(z=self.player.pos.z + z,
-                       y=self.player.pos.y + y,
-                       x=self.player.pos.x + x)
+        pos = Position(z=self.player.z + z,
+                       y=self.player.y + y,
+                       x=self.player.x + x)
 
         if not self.blocked(pos):
             # go ahead, tromp away.
@@ -206,9 +266,9 @@ class Viewport(object):
         "Create viewport instance centered one z-level above player."
         height = 20 # min(height, max(1, (term.height - (_yoff * 2))))
         width = 40 #max(width, max(1, (term.width - (_xoff * 2))))
-        z = world.player.pos.z - 1
-        y = world.player.pos.y - (height // 2)
-        x = world.player.pos.x - (width // 2)
+        z = world.player.z - 1
+        y = world.player.y - (height // 2)
+        x = world.player.x - (width // 2)
         return cls(z, y, x, height, width)
 
     def calculate_view(self, world):
@@ -231,19 +291,20 @@ class Viewport(object):
             x_max = world.player.x + radius
 
         def calc_visible(item):
+            # rename to culling
             # may be seen from above, "eagle's eye", and is within
             # radius squares bounding box.
-            return (self.z < item.pos.z and
-                    x_min <= item.pos.x < x_max and
-                    y_min <= item.pos.y < y_max)
+            return (self.z < item.z and
+                    x_min <= item.x < x_max and
+                    y_min <= item.y < y_max)
 
         # now, select the top-most visible item
         def sort_func(item):
-            return item.pos.z, world.Where[item.where].value
+            return item.z, world.Where[item.where].value
         occlusions = dict()
         for item in sorted(filter(calc_visible, world.items),
                            key=sort_func, reverse=True):
-            occlusions[(item.pos.y, item.pos.x)] = item
+            occlusions[(item.y, item.x)] = item
 
         if radius:
             small_world = World(Materials=world.Materials,
@@ -267,7 +328,7 @@ class Viewport(object):
                 for x in range(self.x, self.x + self.width)]
 
             yield [item if (radius is None or
-                            (item.pos.y, item.pos.x) in self._visible
+                            (item.y, item.x) in self._visible
                             or item == world.player) else
                    Item.create_void(pos=Position(self.z, item.y, item.x),
                                     char=' ')
@@ -339,14 +400,13 @@ class UInterface(object):
     def __init__(self):
         self.term = blessed.Terminal()
         self.dirty = True
-        self._dimensions = (self.term.height, self.term.width)
 
     @property
-    def dimensions(self):
+    def window_size(self):
         return (self.term.height, self.term.width)
 
-    def reader(self):
-        return self.term.inkey(timeout=1)
+    def reader(self, timeout):
+        return self.term.inkey(timeout=timeout)
 
     def reactor(self, world, inp):
         if not inp:
@@ -370,35 +430,33 @@ class UInterface(object):
     @contextlib.contextmanager
     def activate(self):
         with self.term.fullscreen(), self.term.keypad(), self.term.cbreak():
-            load_txt = 'loading ...'
-            ypos = self.term.height // 2
-            xpos = self.term.width // 2 - len(load_txt)
-            echo(self.term.move(ypos, xpos) + load_txt, flush=True)
-            yield
+            self.clear()
+            yield self
 
-    def render(self, world):
+    def clear(self):
+        echo(self.term.clear)
+
+    def render(self, world, incremental=True):
         self.dirty = False
 
-        # C64/spectrum-like border
         _yoff, _xoff = 1, 2
         viewport = Viewport.create(world, self.term, _yoff, _xoff)
         rows = viewport.calculate_view(world)
 
-        with self.term.hidden_cursor(), self.term.location(0, 0):
-            self.draw_decoration(viewport, world)
-        for ypos, cell_items in enumerate(rows):
-            echo(self.term.move(ypos + _yoff, _xoff))
-            echo(u''.join([getattr(self.term, item.color)(item.char)
-                           for item in cell_items]))
+        with self.term.location(0, 0):
+            if not incremental:
+                self.draw_decoration(viewport, world)
+            for ypos, cell_items in enumerate(rows):
+                echo(self.term.move(ypos + _yoff, _xoff))
+                echo(u''.join([getattr(self.term, item.color)(item.char)
+                               for item in cell_items]))
+            echo(self.term.move_y(self.term.height))
+            echo(world.time)
         echo('', flush=True)
 
     def draw_decoration(self, viewport, world, _yoff=1, _xoff=2):
-        #if 8 <= world.time <= 18:
-        #    border_color = self.term.green_reverse
-        #elif 5 <= world.time <= 20:
+        # C64/spectrum-like border
         border_color = self.term.yellow_reverse
-        #else:
-        #    border_color = self.term.red_reverse
         echo(self.term.home)
         echo(border_color(' ' * self.term.width) * _yoff)
         for ypos in range(viewport.height):
@@ -410,21 +468,26 @@ class UInterface(object):
             echo(border_color(' ' * _xoff))
         echo(border_color(' ' * self.term.width) * _yoff, flush=True)
 
-def _loop(ui, world):
 
-    _dimensions = ui.dimensions
-    echo(ui.term.clear)
+TIME_TICK = 0.20
+
+def _loop(ui, world):
+    winsize = None
 
     while True:
-        if ui.dirty:
+        stime = time.time()
+        if ui.dirty or winsize != ui.window_size:
+            ui.render(world, incremental=False)
+            winsize = ui.window_size
+        else:
             ui.render(world)
 
-        inp = ui.reader()
+        inp = ui.reader(timeout=max(0, TIME_TICK - (time.time() - stime)))
 
         for action, properties in ui.reactor(world, inp):
             world.do(action, properties)
 
-        ui.dirty = ui.dirty or _dimensions != UInterface.dimensions
+        world.time.advance()
 
 
 def main(height=50, width=100, worldfile='dat/world.yaml'):
