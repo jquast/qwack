@@ -51,7 +51,7 @@ class Item(object):
                 .format(self=self))
 
     def __str__(self):
-        return '{self.name}, {self.where}'.format(self=self)
+        return '{self.name}, {self.where} {self.material}'.format(self=self)
 
     @classmethod
     def create(cls, pos, char, name, material, weight_range, where, color):
@@ -135,11 +135,11 @@ class World(object):
 
         coords = [(row, col) for row in range(height) for col in range(width)]
 
-        # lay "bedrock", then soil, plant trees.
+        # lay "bedrock", then dirt, plant trees.
         z = cls.z_bedrock
         items.extend(cls._make_zlayer(z+2, coords, worldgen['stone']))
         items.extend(cls._make_zlayer(z+1, coords, worldgen['stone']))
-        items.extend(cls._make_zlayer(z, coords, worldgen['soil']))
+        items.extend(cls._make_zlayer(z, coords, worldgen['dirt']))
         items.extend(cls._make_zlayer(z, coords, worldgen['tree'], 14))
         items.append(Item.create(
             pos=Position(z, *random.choice(coords)),
@@ -334,6 +334,7 @@ class Viewport(object):
 
 class UInterface(object):
     movement_map = {
+        # given input key, move x/y/z coords given
         'h': {'x': -1},
         'H': {'x': -5},
         'j': {'y': 1},
@@ -407,7 +408,8 @@ class UInterface(object):
             for (ypos, xpos, txt_status) in self.generate_status(world):
                 # display text left-of viewport
                 xpos += _xoff + viewport.width + 2
-                disp = txt_status.ljust(viewport.width - (_xoff * 2))
+                ljust_width = self.term.width - (viewport.width + 5 + _xoff)
+                disp = txt_status.ljust(ljust_width, ' ')
                 echo(self.term.move(ypos + _yoff, xpos) + disp)
 
         echo('', flush=True)
