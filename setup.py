@@ -7,7 +7,7 @@ HERE = os.path.dirname(__file__)
 
 setuptools.setup(
     name='qwack',
-    version=0.0.1,
+    version='0.0.2',
     install_requires=['pyyaml', 'blessed'],
     long_description=open(os.path.join(HERE, 'README.rst')).read(),
     description='a quickly written hack (1985) variant for Python.',
@@ -16,6 +16,7 @@ setuptools.setup(
     license='MIT',
     packages=['qwack',],
     url='https://github.com/jquast/qwack',
+    # TODO: ensure dat/world.yaml is distributed as resource
     include_package_data=True,
     zip_safe=True,
 )
