@@ -50,6 +50,9 @@ class Item(object):
                 '{self.pos.z},{self.pos.y},{self.pos.x}>'
                 .format(self=self))
 
+    def __str__(self):
+        return '{self.name}, {self.where}'.format(self=self)
+
     @classmethod
     def create(cls, pos, char, name, material, weight_range, where, color):
         weight = random.uniform(*weight_range)
@@ -66,10 +69,11 @@ class Item(object):
 
 
 class World(object):
-    z_bedrock = 2  # will be ~200 for sequoia trees later ..
+    z_bedrock = 2
 
-    time = 4.50 # begin at 4:30am
+    time = 4.50 # begin "4:30am"
     TICK = 0.1
+    clipping = True
 
     def __init__(self, Materials, Where, items):
         self.Where = Where
@@ -159,18 +163,22 @@ class World(object):
                        y=self.player.pos.y + y,
                        x=self.player.pos.x + x)
 
-        if not self.blocked(pos):
-            # go ahead, tromp away.
+        moved = False
+        if not self.clipping or not self.blocked(pos):
+            # allow player to move to given position.
             self.player.pos = pos
-            self.time += self.TICK
-            return True
-        return False
+            moved = True
+
+        self.time += self.TICK
+        return moved
 
     def blocked(self, pos):
         void = True
         for item in self.find_iter(z=pos.z, y=pos.y, x=pos.x):
             void = False
-            if item.where in ('planted', 'buried'):
+            if item.where in ('buried'):
+                return True
+            if item.name in ('tree'):
                 return True
         if void:
             # nothing was found here
@@ -178,10 +186,10 @@ class World(object):
         return False
 
     def do(self, action, properties):
-        if action == 'move_player':
+        if action == 'do_move_player':
             self.dirty = self.do_move_player(**properties)
-        elif action == 'wait':
-            assert self.do_move_player()
+        elif action == 'toggle_clipping':
+            self.clipping = not self.clipping
         else:
             raise TypeError('do: {0}{1}'.format(action, properties))
 
@@ -211,19 +219,10 @@ class Viewport(object):
         x = world.player.pos.x - (width // 2)
         return cls(z, y, x, height, width)
 
-    def calculate_view(self, world):
-        radius = None
+    def calculate_view(self, world, radius=7):
         y_min, y_max = self.y, self.y + self.height
         x_min, x_max = self.x, self.x + self.width
-        radius = 7
 
-        #if 4 < world.time <= 7:
-        #    # 4am -> 7am: dawn
-        #    radius = 3 + int((world.time - 4) * 1.3)
-        #    #_timestr = 'dawn'
-        #elif 17 < world.time <= 20:
-        #    # 5pm -> 7pm: dusk
-        #    radius = 3 + int((20 - world.time) * 1.3)
         if radius:
             y_min = world.player.y - radius
             y_max = world.player.y + radius
@@ -263,15 +262,14 @@ class Viewport(object):
         for y in range(self.y, self.y + self.height):
             candidate_row_items = [
                 occlusions.get((y, x), Item.create_void(
-                    pos=Position(self.z, y, x), char='-'))
+                    pos=Position(self.z, y, x), char='_'))
                 for x in range(self.x, self.x + self.width)]
 
             yield [item if (radius is None or
                             (item.pos.y, item.pos.x) in self._visible
                             or item == world.player) else
                    Item.create_void(pos=Position(self.z, item.y, item.x),
-                                    char=' ')
-                   for item in candidate_row_items]
+                                    char=' ') for item in candidate_row_items]
 
     def _blocked(self, world, x, y, z):
         return world.blocked(Position(z, y, x))
@@ -335,11 +333,28 @@ class Viewport(object):
 
 
 class UInterface(object):
+    movement_map = {
+        'h': {'x': -1},
+        'H': {'x': -5},
+        'j': {'y': 1},
+        'J': {'y': 5},
+        'k': {'y': -1},
+        'K': {'y': -5},
+        'l': {'x': 1},
+        'L': {'x': 5},
+        'y': {'y': -1, 'x': -1},
+        'u': {'y': -1, 'x': 1},
+        'b': {'y': 1, 'x': -1},
+        'n': {'y': 1, 'x': 1},
+        '<': {'z': -1},
+        '>': {'z': 1},
+    }
 
     def __init__(self):
         self.term = blessed.Terminal()
         self.dirty = True
         self._dimensions = (self.term.height, self.term.width)
+        self.radius = 7
 
     @property
     def dimensions(self):
@@ -350,22 +365,19 @@ class UInterface(object):
 
     def reactor(self, world, inp):
         if not inp:
+            yield ('do_move_player', {})
             return
-        if inp in 'hjklyubn':
+        if inp in self.movement_map:
             self.dirty = True
-            yield ('move_player', {
-                'h': {'x': -1},
-                'j': {'y': 1},
-                'k': {'y': -1},
-                'l': {'x': 1},
-                'y': {'y': -1, 'x': -1},
-                'u': {'y': -1, 'x': 1},
-                'b': {'y': 1, 'x': -1},
-                'n': {'y': 1, 'x': 1},
-            }[inp])
-        elif inp in '.':
-            self.dirty = True
-            yield ('wait', {})
+            yield ('do_move_player', self.movement_map[inp])
+        elif inp == 'c':
+            yield ('toggle_clipping', {})
+        elif inp == 'r':
+            self.radius = 7 if not self.radius else None
+        elif inp == '+' and self.radius is not None and self.radius <= 10:
+            self.radius += 1
+        elif inp == '-' and self.radius is not None and self.radius >= 1:
+            self.radius -= 1
 
     @contextlib.contextmanager
     def activate(self):
@@ -382,23 +394,41 @@ class UInterface(object):
         # C64/spectrum-like border
         _yoff, _xoff = 1, 2
         viewport = Viewport.create(world, self.term, _yoff, _xoff)
-        rows = viewport.calculate_view(world)
 
         with self.term.hidden_cursor(), self.term.location(0, 0):
             self.draw_decoration(viewport, world)
-        for ypos, cell_items in enumerate(rows):
-            echo(self.term.move(ypos + _yoff, _xoff))
-            echo(u''.join([getattr(self.term, item.color)(item.char)
+
+            txt_rows = viewport.calculate_view(world, self.radius)
+            for ypos, cell_items in enumerate(txt_rows):
+                echo(self.term.move(ypos + _yoff, _xoff))
+                echo(u''.join([getattr(self.term, item.color)(item.char)
                            for item in cell_items]))
+
+            for (ypos, xpos, txt_status) in self.generate_status(world):
+                # display text left-of viewport
+                xpos += _xoff + viewport.width + 2
+                disp = txt_status.ljust(viewport.width - (_xoff * 2))
+                echo(self.term.move(ypos + _yoff, xpos) + disp)
+
         echo('', flush=True)
 
+    def generate_status(self, world):
+        yield (1, 1, ('z={player.z} y={player.y} x={player.x}'
+                      .format(player=world.player)))
+        yield (3, 1, 'time {:2.2f}'.format(world.time))
+        endpos = 0
+        for endpos, item in enumerate(world.find_iter(
+            z=world.player.z, y=world.player.y, x=world.player.x
+        )):
+            yield (5 + (endpos * 2), 1, item.__str__())
+
+        # clean up trailing artifacts, if any
+        while endpos < 6:
+            endpos += 1
+            yield (5 + (endpos * 2), 1, '')
+
     def draw_decoration(self, viewport, world, _yoff=1, _xoff=2):
-        #if 8 <= world.time <= 18:
-        #    border_color = self.term.green_reverse
-        #elif 5 <= world.time <= 20:
         border_color = self.term.yellow_reverse
-        #else:
-        #    border_color = self.term.red_reverse
         echo(self.term.home)
         echo(border_color(' ' * self.term.width) * _yoff)
         for ypos in range(viewport.height):
