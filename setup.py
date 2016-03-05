@@ -16,6 +16,7 @@ setuptools.setup(
     license='MIT',
     packages=['qwack',],
     url='https://github.com/jquast/qwack',
+    # TODO: ensure dat/world.yaml is distributed as resource
     include_package_data=True,
     zip_safe=True,
 )
