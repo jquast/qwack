@@ -29,7 +29,7 @@ WorldGen:
             where: buried
             color: white
 
-        soil:
+        dirt:
             name: soil
             char: '.'
             material: soil
