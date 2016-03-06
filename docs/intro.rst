@@ -13,3 +13,24 @@ Contributing
 You are welcome to make a pull request ...
 
 .. _hack: https://en.wikipedia.org/wiki/Hack_%28Unix_video_game%29
+
+.. note::  this is a special note, hello.
+
+.. warning:: beware!
+
+
+Wild Stuff!
+~~~~~~~~~~~
+
+.. code-block:: python
+
+   def function(a):
+        return a**2
+
+.. code-block:: bash
+
+   function() {
+        return $(( $1 ** 2 ))
+   }
+
+See you see the :class:`qwack.main.Item` class !?
