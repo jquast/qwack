@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from __future__ import division
 import collections
 import contextlib
 import functools
@@ -15,16 +16,16 @@ import yaml
 try:
     # pylint: disable=invalid-name
     #         Invalid constant name "echo"
-    echo = functools.partial(print, end='', flush=True)
-    echo(u'')
+    echo = functools.partial(print, end='')
+    echo(u'', flush=True)
 except TypeError:
     # TypeError: 'flush' is an invalid keyword argument for this function
 
     import sys
-    def echo(text):
-        """Display ``text`` and flush output."""
+    def echo(text, flush=False):
         sys.stdout.write(u'{}'.format(text))
-        sys.stdout.flush()
+	if flush:
+            sys.stdout.flush()
 
 # goal:
 #
@@ -296,7 +297,7 @@ class Viewport(object):
                             (item.y, item.x) in self._visible
                             or item == world.player) else
                    Item.create_void(pos=Position(self.z, item.y, item.x),
-                                    char=' ') for item in candidate_row_items]
+                                    char='x') for item in candidate_row_items]
 
     def _blocked(self, world, x, y, z):
         return world.blocked(Position(z, y, x))
@@ -429,7 +430,7 @@ class UInterface(object):
             for ypos, cell_items in enumerate(txt_rows):
                 echo(self.term.move(ypos + _yoff, _xoff))
                 echo(u''.join([getattr(self.term, item.color)(item.char)
-                           for item in cell_items]))
+                           for item in cell_items]), flush=True)
 
             for (ypos, xpos, txt_status) in self.generate_status(world):
                 # display text left-of viewport
