@@ -5,35 +5,39 @@ import textwrap
 import functools
 import enum
 import timeit
-import subprocess
 import random
 import math
 import time
-import io
 import os
 
 # 3rd party
 import blessed
 import yaml
-import PIL.Image
 
 # local
 import u4_data
+import u4_tiler
 
 echo = functools.partial(print, end="")
 Position = collections.namedtuple("Position", ("y", "x"))
 
-CHAFA_BIN = os.path.join(
-    os.path.dirname(__file__), os.pardir, os.pardir, "chafa", "tools", "chafa", "chafa"
-)
-CHAFA_TRIM_START = len("\x1b[?25l\x1b[0m")
-CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1"]
+
+# todo: Vector? (direction)
+def make_direction(y=0, x=0):
+    text = []
+    if y:
+        text.append("North" if y < 0 else "South")
+    if x:
+        text.append("West" if x < 0 else "East")
+    return " ".join(text)
+
+
 # This was "font ratio", 3/2, but with tiles that have already been converted
 # to their correct aspect ratio by CHAFA, '1' provides the best "circle" effect
 DEFAULT_RADIUS = 6
 VIS_RATIO = 1
 MAX_DARKNESS_LEVEL = 4
-TIME_ANIMATION_TICK = 0.30
+TIME_ANIMATION_TICK = 0.20
 TIME_PLAYER_PASS = 23
 MIN_TILE_SIZE = 7
 MAX_TILE_SIZE = 29
@@ -41,12 +45,16 @@ TEXT_HISTORY_LENGTH = 1000
 DEFAULT_TILE_SIZE = 16
 MAX_RADIUS = 9
 LORD_BRITISH_CASTLE_ID = 14
+# the tile size of our stored tiles/*.png files, they are 16x16
+# natively but their resolution was doubled, it appears to give
+# libchafa better hints about "shape" of these "blocky" tiles
+SHAPE_TILE_SIZE = 32
 
 
 # probably better in the YAML, but gosh, lots of junk in "World" ?
 SHIP_TILE_DIRECTIONS = {16: "West", 17: "North", 18: "East", 19: "South"}
 DIRECTION_SHIP_TILES = {v: k for k, v in SHIP_TILE_DIRECTIONS.items()}
-
+DEFAULT_SHAPE_FILENAME = "jsteele-shapes.vga"
 
 @contextlib.contextmanager
 def elapsed_timer():
@@ -110,13 +118,24 @@ class Item(object):
     def pos(self):
         return self._pos
 
+    def get_animation_y_offset(self, world):
+        if self.tile_id in (0, 1, 2, 3, 68, 69, 70, 71):
+            # water and fields are animated by vertical offset, this should
+            # give 8 positions evenly spread across 32 pixels
+            return 32 - (int(time.monotonic() * 100) % 8) * 4
+        return 0
+
     def is_adjacent(self, other_item):
         # Check if the target coordinates are adjacent to the given coordinates
-        return (abs(self.x - other_item.x) == 1 and self.y == other_item.y or
-                abs(self.y - other_item.y) == 1 and self.x == other_item.x)
+        return (
+            abs(self.x - other_item.x) == 1
+            and self.y == other_item.y
+            or abs(self.y - other_item.y) == 1
+            and self.x == other_item.x
+        )
 
     def distance(self, other_item):
-        return math.sqrt((self.x - other_item.x)**2 + (self.y - other_item.y)**2)
+        return math.sqrt((self.x - other_item.x) ** 2 + (self.y - other_item.y) ** 2)
 
     @property
     def is_boat(self):
@@ -172,7 +191,9 @@ class World(object):
     clipping = True
     wizard_mode = False
 
-    def __init__(self, items=None, Materials=None, Where=None, Portals=None, world_data=None):
+    def __init__(
+        self, items=None, Materials=None, Where=None, Portals=None, world_data=None
+    ):
         self.Where = Where
         self.Materials = Materials
         self.Portals = Portals
@@ -227,11 +248,7 @@ class World(object):
         )
 
     def find_iter_not_player(self, **kwargs):
-        return (
-            item
-            for item in self.find_iter(**kwargs)
-            if item.name != 'player'
-        )
+        return (item for item in self.find_iter(**kwargs) if item.name != "player")
 
     def find_one(self, **kwargs):
         try:
@@ -262,7 +279,7 @@ class World(object):
         return cls(
             Materials=enum.Enum("Material", world_data["Materials"]),
             Where=enum.Enum("Where", world_data["Where"]),
-            Portals=world_data["Portals"],
+            Portals=world_data["World"]["Portals"],
             items=items,
             world_data=world_data,
         )
@@ -279,7 +296,7 @@ class World(object):
                     y=(chunk_y * chunk_size) + div_y,
                     x=(chunk_x * chunk_size) + div_x,
                 )
-                tile_definition = world_data["WorldMap"][raw_val]
+                tile_definition = world_data["Shapes"][raw_val]
                 item = Item(
                     tile_id=raw_val,
                     pos=pos,
@@ -327,26 +344,40 @@ class World(object):
                 viewport.add_text("BLOCKED!")
                 can_move = False
         if can_move:
-            if y:
-                viewport.add_text(f">{'North' if y < 0 else 'South'}")
-            if x:
-                viewport.add_text(f">{'West' if x < 0 else 'East'}")
+            viewport.add_text(make_direction(y=y, x=x))
             self.player.pos = pos
         return pos != previous_pos
 
-    def board_ship_or_mount_horse(self):
+    def do_open_door(self, viewport, y=0, x=0):
+        # is there an (unlocked) door ?
+        door = self.find_one(y=self.player.y + y, x=self.player.x + x, tile_id=59)
+        if door:
+            # then set it open!
+            door.tile_id = 62
+            door.last_action_tick = self.time
+            door.land_passable = True
+            door.darkness = 0
+            return True
+        else:
+            viewport.add_text_append(f"{y or ''}{x or ''}")
+            viewport.add_text("NOT HERE!")
+        return False
+
+    def board_ship_or_mount_horse(self, viewport):
         boat = self.find_one(name="boat", pos=self.player.pos)
         if not boat and self.wizard_mode:
             # wizards can "Board" any tile, LoL!
             boat = next(self.find_iter_not_player(pos=self.player.pos))
         elif not boat:
+            viewport.add_text("Board WHAT?")
             return False
         self.player.tile_id = boat.tile_id
         self.items.remove(boat)
         return True
 
-    def exit_ship_or_unmount_horse(self):
+    def exit_ship_or_unmount_horse(self, viewport):
         if not self.player.is_boat and not self.wizard_mode:
+            viewport.add_text("Not HERE!")  # XXX Check
             return False
         boat = Item.create_boat(self.player.pos, self.player.tile_id)
         self.items.append(boat)
@@ -355,29 +386,11 @@ class World(object):
 
     def check_boat_direction(self, y, x):
         boat_direction = SHIP_TILE_DIRECTIONS.get(self.player.tile_id)
-        can_move = (
-            boat_direction in ("North", "West")
-            if (y < 0 and x < 0)
-            else boat_direction in ("South", "East")
-            if (y > 0 and x > 0)
-            else boat_direction in ("North", "East")
-            if (y < 0 and x > 0)
-            else boat_direction in ("South", "West")
-            if (y > 0 and x < 0)
-            else boat_direction == "North"
-            if y < 0
-            else boat_direction == "South"
-            if y > 0
-            else boat_direction == "West"
-            if x < 0
-            else boat_direction == "East"
-            if x > 0
-            else False
-        )
-        next_direction = (
-            "West" if x < 0 else "East" if x > 0 else "North" if y < 0 else "South"
-        )
-        # You can't move that way, but, turn towards that direction, though.
+        # is the boat facing the direction we want to move?
+        can_move = boat_direction in make_direction(y=y, x=x).split()
+        # turn towards the direction whether we can_move or not
+        next_direction = make_direction(y, x).split(" ", 1)[0]
+        # conditionally set boat direction
         self.player.tile_id = DIRECTION_SHIP_TILES.get(
             next_direction, self.player.tile_id
         )
@@ -390,7 +403,11 @@ class World(object):
         if self.Portals:
             for portal in self.Portals:
                 if portal["y"] == pos.y and portal["x"] == pos.x:
-                    return {"dest_id": portal["dest_id"], "action": portal["action"]}
+                    return {
+                        "dest_id": portal["dest_id"],
+                        "start_x": portal["start_x"],
+                        "start_y": portal["start_y"],
+                    }
 
     def check_tile_movement(self, pos) -> int:
         # if any tile at given location has a "speed" variable, then,
@@ -399,7 +416,9 @@ class World(object):
         # When travelling north, check if player is on Lord British's Castle
         # and Deny movement on any match
         if pos.y < self.player.y:
-            for item in self.find_iter(y=self.player.y, x=self.player.x, tile_id=LORD_BRITISH_CASTLE_ID):
+            for item in self.find_iter(
+                y=self.player.y, x=self.player.x, tile_id=LORD_BRITISH_CASTLE_ID
+            ):
                 return -1
         for item in self.find_iter(y=pos.y, x=pos.x, where="buried"):
             if item.speed:
@@ -436,7 +455,7 @@ class World(object):
 
     def darkness(self, item):
         distance = item.distance(self.player)
-        fn_trim = math.ceil if random.randrange(2) else math.floor
+        fn_trim = math.ceil if not random.randrange(6) else math.floor
         return fn_trim(min(max(0, distance - 2), MAX_DARKNESS_LEVEL))
 
     def tick(self, small_world):
@@ -448,13 +467,18 @@ class World(object):
         # or making an invalid action, etc
         self.time += self.TICK
         self.check_close_opened_doors(small_world)
-    
+
     def check_close_opened_doors(self, small_world):
-        # close door after 4 game ticks
-        for door in small_world.find_iter(tile_id=60):
+        # close door after 4 game ticks, a door is always named "Unlocked Door"
+        # if it was "O"pened, but is temporarily with a different tile_id
+        for door in small_world.find_iter(name="Unlocked Door"):
             if self.time > door.last_action_tick + 4:
                 door.tile_id = 59
-        
+                door.land_passable = False
+                door.darkness = 1
+                return True
+        return False
+
 
 class UInterface(object):
     movement_map = {
@@ -469,13 +493,48 @@ class UInterface(object):
         "n": {"y": 1, "x": 1},
     }
 
-    def __init__(self):
+    # when defined, the monotonic time a user pressed "O"pen
+    # and that we are awaiting a direction key (NSEW)
+    waiting_open_direction = 0
+
+    def __init__(self, ShapeFiles, shape_filename=DEFAULT_SHAPE_FILENAME, tile_size=DEFAULT_TILE_SIZE, darkness=True, radius=DEFAULT_RADIUS):
         self.term = blessed.Terminal()
         self.dirty = True
-        self.radius = DEFAULT_RADIUS
-        tile_size = DEFAULT_TILE_SIZE
-        self.darkness = True
+        self.radius = radius
+        self.darkness = darkness
+        # whether we are waiting for a direction key
+        # after using "O"pen, there will probably be
+        # a lot more of these, maybe a "store next action"
+        # is needed -- this *seems* it should exist in the UI,
+        # but maybe there needs to be another abstraction,
+        # we will see..
+        self.ShapeFiles = ShapeFiles
+        # todo: move to u4_tiler.py as Shapes.py
+        self.shape_data = self.load_shape_data(shape_filename)
+        # because this uses "magic" in setter, set only after shape_data
         self.tile_size = tile_size
+
+    def load_shape_data(self, shape_filename):
+        load_fn = None
+        for sf in self.ShapeFiles:
+            if sf["filename"] == shape_filename:
+                load_fn = (u4_tiler.load_shapes_ega if sf["mode"] == "EGA" else 
+                           u4_tiler.load_shapes_vga)
+                # self.shapes_data = sf["shapes"]
+                break
+        if load_fn is None:
+            raise ValueError(f"No matching records by shape_filename={shape_filename!r}")
+        self.shape_filename = shape_filename
+        return load_fn()
+    
+    def cycle_shapes(self):
+        # given the current self.shape_filename, cycle to the next
+        for idx in range(len(self.ShapeFiles)):
+            if self.ShapeFiles[idx]["filename"] == self.shape_filename:
+                self.shape_filename = self.ShapeFiles[(idx + 1) % len(self.ShapeFiles)]["filename"]
+                self.reload_shapes()
+                return
+
 
     @property
     def tile_size(self):
@@ -485,12 +544,17 @@ class UInterface(object):
     def tile_size(self, value):
         self._tile_size = value
         self.tile_width = value
-        # determine final tile height by encoding any tile and measuring result
+        # determine final tile height by encoding any tile and measuring returned tile height, so that
+        # we let CHAFA decide the best font "aspect ratio" for the given 16x16 tile
         self.tile_height = len(
-            UInterface.get_tile(id=0, width=value, height=value, darkness=0)
+            u4_tiler.make_tile(
+                self.shape_data,
+                tile_id=0xFF,
+                tile_width=value,
+                tile_height=value,
+                darkness=0,
+            )
         )
-        assert self.tile_height != self.tile_width # XXX CHECK VALV
-        assert self.tile_height != 16, self.tile_height
 
     @property
     def window_size(self):
@@ -502,44 +566,59 @@ class UInterface(object):
     def reactor(self, inp, world, viewport):
         self.dirty = True
         if inp in self.movement_map:
-            self.dirty = world.do_move_player(viewport, **self.movement_map[inp])
+            if self.waiting_open_direction:
+                viewport.add_text_append(make_direction(**self.movement_map[inp]))
+                self.dirty = world.do_open_door(viewport, **self.movement_map[inp])
+                self.waiting_open_direction = 0
+            else:
+                self.dirty = world.do_move_player(viewport, **self.movement_map[inp])
             # TODO: could return a new world, when exiting the current one
             # world = world.maybe_exit(world)
-        elif inp == "O":
-            # 'O'pen door
-            door = world.find_one(y=world.player.y, x=world.player.x, tile_id=59)
-            if door:
-                door.tile_id = 60
-                door.last_action_tick = world.time
-                self.dirty = True
+        elif self.waiting_open_direction:
+            # invalid direction after "O"pen
+            if inp:
+                viewport.add_text_append(f"{inp or ''}")
+                viewport.add_text("NOT HERE!")
+            self.waiting_open_direction = 0
+        elif inp == "o":
+            viewport.add_text("Open-")
+            self.waiting_open_direction = time.monotonic()
         elif inp == "E":
             # 'E'nter Portal
             portal = world.find_portal(world.player.pos)
             if portal:
                 viewport.dirty = True
-                world = World.load(map_id=portal["dest_id"], world_data=world.world_data)
+                world = World.load(
+                    map_id=portal["dest_id"], world_data=world.world_data
+                )
         elif inp == "B":
             # 'B'oard ship or mount horse
-            self.dirty = world.board_ship_or_mount_horse()
+            self.dirty = world.board_ship_or_mount_horse(viewport)
         elif inp == "X":
             # e 'X'it ship or unmount horse
-            self.dirty = world.exit_ship_or_unmount_horse()
+            self.dirty = world.exit_ship_or_unmount_horse(viewport)
         elif inp == "{" and self.tile_size > MIN_TILE_SIZE:
             self.tile_size -= 2
         elif inp == "}" and self.tile_size < MAX_TILE_SIZE:
             self.tile_size += 2
-        elif inp == '\x17':   # Control-W
+        elif inp == "\x17":  # Control-W
             world.wizard_mode = not world.wizard_mode
+            _enabled = {"enabled" if world.wizard_mode else "disabled"}
+            viewport.add_text(f"Wizard mode {_enabled}")
         elif world.wizard_mode:
             # keys for wizards !
             if inp == "C":
                 world.clipping = not world.clipping
+                _enabled = {"enabled" if world.clipping else "disabled"}
+                viewport.add_text(f"Clipping mode {_enabled}")
             elif inp == "A":
                 self.auto_resize(viewport)
             elif inp == "R":
                 self.radius = DEFAULT_RADIUS if not self.radius else None
             elif inp == "\x04":  # ^D
                 self.darkness = not self.darkness
+                _enabled = {"enabled" if world.darkness else "disabled"}
+                viewport.add_text(f"Darkness {_enabled}")
             elif inp == ")" and self.radius is not None and self.radius < MAX_RADIUS:
                 self.radius += 1
             elif inp == "(" and self.radius is not None and self.radius >= 2:
@@ -548,9 +627,14 @@ class UInterface(object):
         else:
             if time.monotonic() > world.time_monotonic_last_action + TIME_PLAYER_PASS:
                 world.player.last_action_tick = world.time
-                world.tick(viewport.small_world)
             else:
+                # return early
                 self.dirty = False
+                return world
+        if self.dirty:
+            # Ultima IV is cruel, if *anything* happens it drives
+            # the game forward if it can!
+            world.tick(viewport.small_world)
         return world
 
     def auto_resize(self, viewport):
@@ -587,9 +671,9 @@ class UInterface(object):
             yield self
 
     def debug_details(self):
-        tile_cache_efficiency = 1 - (self.get_tile.cache_info().misses / (self.get_tile.cache_info().hits or 1))
         return {
-            "tile-cache": f'{tile_cache_efficiency*100:2.2f}%',
+#            "tiler-misses": u4_tiler.make_tile.cache_info().misses,
+#            "tiler-hits": u4_tiler.make_tile.cache_info().hits,
             "tile-width": self.tile_width,
             "tile-height": self.tile_height,
             "radius": self.radius,
@@ -674,16 +758,24 @@ class UInterface(object):
                     xpos = cell_number * self.tile_width
                     actual_xpos = xpos + viewport.xoffset
                     if items:
+                        # todo: an ItemsCollection should have 'foreground' and 'background'
+                        bg_tile_id = None
+                        if len(items) > 1:
+                            bg_tile_id = items[-1].tile_id
                         tile_darkness = (
                             viewport.small_world.darkness(items[0])
                             if self.darkness
                             else 0
                         )
-                        tile_ans = UInterface.get_tile(
+                        tile_ans = u4_tiler.make_tile(
+                            self.shape_data,
                             items[0].tile_id,
-                            width=self.tile_width,
-                            height=self.tile_height,
+                            tile_width=self.tile_width,
+                            tile_height=self.tile_height,
+                            y_offset=items[-1].get_animation_y_offset(world),
                             darkness=tile_darkness,
+                            max_darkness_level=MAX_DARKNESS_LEVEL,
+                            bg_tile_id=bg_tile_id,
                         )
                         for ans_y, ans_txt in enumerate(tile_ans):
                             actual_ypos = ypos + ans_y + viewport.yoffset
@@ -692,47 +784,6 @@ class UInterface(object):
                                 echo(ans_txt)
             echo("", flush=True)
             self.dirty = False
-
-    @functools.lru_cache(maxsize=256)
-    @staticmethod
-    def get_tile(
-        id,
-        width,
-        height,
-        # effects,
-        darkness,
-        x_offset=0,
-        y_offset=0,
-    ):
-        if id == -1 or darkness == MAX_DARKNESS_LEVEL:
-            return [" " * width] * height
-
-        fpath_png = os.path.join(
-            os.path.dirname(__file__), "tiles", f"tile_{id:02X}_{darkness}.png"
-        )
-
-        bdata = open(fpath_png, "rb").read()
-        if y_offset or x_offset:
-            # load PNG data to apply effects with PIL,
-            image = PIL.Image.open(io.BytesIO(bdata))
-            if y_offset or x_offset:
-                image = image.offset(x_offset, y_offset)
-            ## export image as PNG bytes
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format="PNG")
-            bdata = img_byte_arr.getvalue()
-        chafa_cmd_args = [
-            CHAFA_BIN,
-            *CHAFA_EXTRA_ARGS,
-            "--size",
-            f"{width}x{width}",
-            "-",
-        ]
-        ans = subprocess.check_output(chafa_cmd_args, input=bdata).decode()
-        lines = ans.splitlines()
-        # remove any hide/show cursor attributes
-        return_list = [lines[0][CHAFA_TRIM_START:]] + lines[1:-1]
-        return return_list
 
 
 class Viewport:
@@ -762,6 +813,13 @@ class Viewport:
 
     def add_text(self, text):
         self.text.append(text)
+        self.dirty = True
+
+    def add_text_append(self, text):
+        # add text to the last line for continuation of paragraph,
+        # actions to result, etc.
+        self.text.append(self.text.pop() + text)
+        self.dirty = True
 
     @classmethod
     def create(cls, world, ui, yoffset=1, xoffset=2):
@@ -803,8 +861,12 @@ class Viewport:
 
         for y in range(self.y, self.y + self.get_tiled_height(ui)):
             yield [
-                (items_by_yx.get((y, x)) if not ui.radius or (y, x) in visible
-                 else [make_void(y, x)]) or [make_void(y, x)]
+                (
+                    items_by_yx.get((y, x))
+                    if not ui.radius or (y, x) in visible
+                    else [make_void(y, x)]
+                )
+                or [make_void(y, x)]
                 for x in range(self.x, self.x + self.get_tiled_width(ui))
             ]
 
@@ -812,8 +874,9 @@ class Viewport:
         # find the ideal tile_size,
         y_min, y_max = self.y, self.y + self.get_tiled_height(ui)
         x_min, x_max = self.x, self.x + self.get_tiled_width(ui)
+
         def fn_culling(item):
-            return (x_min <= item.x < x_max and y_min <= item.y < y_max)
+            return x_min <= item.x < x_max and y_min <= item.y < y_max
 
         # sort by top-most visible item
         def sort_func(item):
@@ -826,8 +889,8 @@ class Viewport:
         # aren't using? and, we should drop 'z', and index everything by
         # (Y, X) naturally with values of items.
         for item in sorted(
-                filter(fn_culling, world.items),
-                key=sort_func, reverse=False):
+            filter(fn_culling, world.items), key=sort_func, reverse=False
+        ):
             occlusions[(item.y, item.x)].append(item)
 
         # this creates a small world as a side-effect, but, it is useful
@@ -968,7 +1031,6 @@ def _loop(ui, world, viewport):
         else:
             with elapsed_timer() as time_input:
                 inp = ui.reader(timeout=max(0, TIME_ANIMATION_TICK))
-                first_tick = 0
                 # throw away remaining input, small hack for
                 # games where folks bang on the keys to run
                 # (or boat!) as fast as they can, take "out"
@@ -984,11 +1046,8 @@ def _loop(ui, world, viewport):
         with elapsed_timer() as time_action:
             world = ui.reactor(inp, world, viewport)
 
-def init_begin_world():
-    # a small optimization, global world data is carried
-    # over for each exit/entry into other worlds on subsequent load(),
-    FPATH_WORLD_YAML = os.path.join(os.path.dirname(__file__), "dat", "world.yaml")
-    world_data = yaml.load(open(FPATH_WORLD_YAML, "r"), Loader=yaml.SafeLoader)
+
+def init_begin_world(world_data):
     world = World.load(map_id=-1, world_data=world_data)
 
     # Add test boat!
@@ -999,10 +1058,17 @@ def init_begin_world():
 
 
 def main():
-    # a ui provides i/o, keyboard input and screen output
-    ui = UInterface()
+    # a small optimization, global world data is carried over for each
+    # exit/entry into other worlds on subsequent load(), (..it could also
+    # be refreshed automatically dynamically on each next world load)
+    FPATH_WORLD_YAML = os.path.join(os.path.dirname(__file__), "dat", "world.yaml")
+    world_data = yaml.load(open(FPATH_WORLD_YAML, "r"), Loader=yaml.SafeLoader)
 
-    world = init_begin_world()
+    # a ui provides i/o, keyboard input and screen output, world.yaml now
+    # stores non-world data, might as well be renamed into config_data.yaml
+    # or such
+    ui = UInterface(ShapeFiles=world_data["ShapeFiles"])
+    world = init_begin_world(world_data)
     viewport = Viewport.create(world, ui)
     ui.auto_resize(viewport)
     ui.maybe_draw_viewport(viewport)
@@ -1015,13 +1081,20 @@ if __name__ == "__main__":
 
 
 # graphics improvements todo,
-# - scale text character sets, so 16x+ get matching "large text"
-#   u4 original had aprox. 15 characters wide
-# - then better center the avatar, divide and center screen remainder
-# - smooth scrolling
+# - carve up & chafa to make glyph tiles for the screen borders
+#   using josh steele's xu4 screen asset, this would allow us to
+#   scale to many many resolutions to retain aspect ratio
+# - intro screen & menu ?!
+# - what about the "scene" that is played, too??
 # - animated tiles,
-#   - dynamically shift X+Y every frame?
-#   - wave flags of castles
+#   - wave flags of castles somehow it is done..
+# - water animations are actually really smooth on a2,
+#   they move one pixel at a time! so maybe
+#   y_offset = world.time % (tile_height // 2)
+# - scale text character sets, so 16x+ get matching "large text"
+#   u4 original had aprox. 15 characters wide "text area"
+#   load_shapes_png
+# - if re-implemented crop, smooth scrolling is possible
 # TODO: brightness depending on moon cycles !!
 #
 # movement improvements
@@ -1035,6 +1108,7 @@ if __name__ == "__main__":
 # - a client only renders what's going on, text + tile_id's,
 #   that are interactions
 # - a server generates the AI, responds to NPC chat, etc.
+#
 # There should be two blended worlds,
 # - one static world, retrieved from SQL, never refreshed,
 #   always in memory, chunked, and fast to query, for
@@ -1048,6 +1122,13 @@ if __name__ == "__main__":
 #
 
 # ideas,
+# - get_tile x_offset and y_offset can be used for much
+#   more than seawaves, it can be used with random() jiter
+#   for when under confusion, or maybe when hungry, nice!
+# - implement nethack's hallucinations, with graphics effects
+#   and crazy tile switching, do a bit better in letting the
+#   hallucination persist with some random time, instead
+#   of changing each frame.
 # - world map
 # - fog of war for unexplored areas in map only
 # - running ship into short or shallow water should beach it
@@ -1060,3 +1141,43 @@ if __name__ == "__main__":
 #   below it, need only <, '=' of green, '=' of
 #   or missing '>', and the ability to change the
 #   color of the text would be nice ..
+#
+#
+# the way a tile can be labelled as a 'Boat' and flown as a wizard
+# mechanic, this could be used for real in-game mechanic, of a
+# "magic carpet" or similar (!)
+#
+#
+# Today,
+#
+# - make the code run again !
+#
+# - pre-render all ansi! persist to disk! removes chafa library need at runtime !!
+#   - it would have to be all tiles
+#     - at all resolutions
+#     - at all darkness levels
+#     - at all y-offset animations
+#   - packed up into structures organized by
+#     - size as filename
+#     - contents as yaml dictionary
+#     - keyed by tile_id
+#     - results as array of ansi strings
+#
+#   (!)
+#
+# - make world enter @ start_x, start_y work
+# - make world exit out-of-bounds ("step into void") work
+#
+# fix directionals, allow *both* ??
+# - hjkl + yubn (already done)
+# - wasd + qezc
+# - numpad (by using application keys mode)
+# with exception of common actions, all of them should be then upper case
+# lowercase;
+# - 'o'pen, 
+# - 'b'oard,
+# - 'x'it,
+# - 'p'eer,
+# uppercase to avoid conflict:
+#
+# 'E'nter, 'C'ast, 'K'limb, 'D'escend, 
