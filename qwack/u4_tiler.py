@@ -1,3 +1,4 @@
+import contextlib
 import subprocess
 import functools
 import struct
@@ -5,17 +6,24 @@ import array
 import zlib
 import os
 import io
+import timeit
 
 # 3rd party
 import PIL.Image
 
 # import colorsys
 
+MAX_DARKNESS_LEVEL = 4
+MIN_TILE_SIZE = 2
+MAX_TILE_SIZE = 16
+
 CHAFA_BIN = os.path.join(
     os.path.dirname(__file__), os.pardir, os.pardir, "chafa", "tools", "chafa", "chafa"
 )
 CHAFA_TRIM_START = len("\x1b[?25l\x1b[0m")
-CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1"]
+# very strange, higher optimization levels (-O 3 or greater) add aliasing, which causes blurring
+# which ends up with images 50% darker, so -O 1 is used !
+CHAFA_EXTRA_ARGS = ["-w", "9", "-O", "1"]
 
 
 # todo: make a Shapes class, of course!
@@ -37,7 +45,7 @@ def apply_darkness(image, darkness, max_darkness_level):
             image.putpixel((x + 1, y), black)
             image.putpixel((x + 1, y + 1), black)
     return image
-        
+
 
 def apply_over_background(bg_image, fg_image):
     # Convert to RGBA mode, set black pixels as alpha transprancy layer
@@ -52,67 +60,28 @@ def apply_over_background(bg_image, fg_image):
     return bg_image
 
 
-
-#@functools.lru_cache(maxsize=256 * 16)
-def make_tile(
+# @functools.lru_cache(maxsize=256 * 16)
+def get_ansi_txt_tile(
     shape_data,
     tile_id,
     tile_width,
     tile_height,
     # effects,
     darkness=0,
-    x_offset=0,
-    y_offset=0,
-    bg_tile_id=None,
-    max_darkness_level=1,   # todo repeated in main.py
+#    x_offset=0,
+#    y_offset=0,
+#    inverse=False,
+#    bg_tile_id=None,
+#    max_darkness_level=1,  # todo repeated in main.py
 ):
-    # special tile_id -1 is "Void" and cannot display, or so dark
-    # that it cannot be displayed, fast black tile in any case
-    if tile_id == -1 or darkness >= max_darkness_level:
-        return [" " * tile_width] * tile_height
-
-    bg_image = None
-    applied_image = None
-    fg_image = make_image_from_pixels(shape_data[tile_id])
-    if bg_tile_id is not None:
-        bg_image = make_image_from_pixels(shape_data[bg_tile_id])
-
-    if darkness:
-        # apply darkness to both layers
-        fg_image = apply_darkness(fg_image, darkness, max_darkness_level)
-        if bg_image:
-            bg_image = apply_darkness(bg_image, darkness, max_darkness_level)
-    if y_offset or x_offset:
-        # apply y & x offsets to the background tile or only visible tile
-        if bg_image is not None:
-            bg_image = apply_offsets(x_offset, y_offset, bg_image)
-        else:
-            fg_image = apply_offsets(x_offset, y_offset, fg_image)
-    if bg_image is not None and fg_image:
-        # apply fg over background image
-        ref_image = apply_over_background(bg_image, fg_image)
-        img_byte_arr = io.BytesIO()
-        ref_image.save(img_byte_arr, format="PNG")
-    else:
-        ref_image = fg_image or bg_image
-
-    img_byte_arr = io.BytesIO()
-    ref_image.save(img_byte_arr, format="PNG")
-
-    chafa_cmd_args = [
-        CHAFA_BIN,
-        *CHAFA_EXTRA_ARGS,
-        "--size",
-        f"{tile_width}x{tile_width}",
-        "-",
-    ]
-    ans = subprocess.check_output(chafa_cmd_args, input=img_byte_arr.getvalue()).decode()
-    lines = ans.splitlines()
-
-    # remove preceeding and trailing hide/show cursor attributes
-    return_list = [lines[0][CHAFA_TRIM_START:]] + lines[1:-1]
-    return return_list
-
+    if tile_id == -1 or darkness >= MAX_DARKNESS_LEVEL:
+        # special tile_id -1 is "Void" and cannot display, or so dark
+        # that it cannot be displayed, generate a fast black tile in any case,
+        # this could be a higher level but maybe we could do something
+        # interesting for fully black tile, especially with 'effects', like
+        # inverse.
+        return ["\x1b[0m" + (" " * tile_width)] * tile_height
+    return shape_data[tile_id][darkness]["value"]
 def apply_offsets(x_offset, y_offset, ref_image):
     tmp_img = PIL.Image.new(ref_image.mode, ref_image.size)
 
@@ -140,9 +109,30 @@ def scale(tile: list[tuple], scale_factor):
     return result
 
 
-def load_shapes_ega():
+def load_shapes_ega(filename):
+    # from https://github.com/jtauber/ultima4 a bit outdated project
     shapes = []
-    shape_bytes = open("ULT/SHAPES.EGA", "rb").read()
+    shape_bytes = open(
+        os.path.join(os.path.dirname(__file__), "dat", filename), "rb"
+    ).read()
+    ega2rgb = [
+        (0x00, 0x00, 0x00),
+        (0x00, 0x00, 0xAA),
+        (0x00, 0xAA, 0x00),
+        (0x00, 0xAA, 0xAA),
+        (0xAA, 0x00, 0x00),
+        (0xAA, 0x00, 0xAA),
+        (0xAA, 0x55, 0x00),
+        (0xAA, 0xAA, 0xAA),
+        (0x55, 0x55, 0x55),
+        (0x55, 0x55, 0xFF),
+        (0x55, 0xFF, 0x55),
+        (0x55, 0xFF, 0xFF),
+        (0xFF, 0x55, 0x55),
+        (0xFF, 0x55, 0xFF),
+        (0xFF, 0xFF, 0x55),
+        (0xFF, 0xFF, 0xFF),
+    ]
 
     for i in range(256):
         shape = []
@@ -150,18 +140,18 @@ def load_shapes_ega():
             for k in range(8):
                 d = shape_bytes[k + 8 * j + 128 * i]
                 a, b = divmod(d, 16)
-                shape.append(EGA2RGB[a])
-                shape.append(EGA2RGB[b])
+                shape.append(ega2rgb[a])
+                shape.append(ega2rgb[b])
         shapes.append(shape)
     return shapes
 
 
-def load_shapes_vga():
+def load_shapes_vga(filename):
     # loads the VGA set, from http://www.moongates.com/u4/upgrade/files/u4upgrad.zip
     # or, from https://github.com/jahshuwaa/u4graphics
     shapes = []
     shape_bytes = open(
-        os.path.join(os.path.dirname(__file__), "dat", "SHAPES.VGA"), "rb"
+        os.path.join(os.path.dirname(__file__), "dat", filename), "rb"
     ).read()
     shape_pal = open(
         os.path.join(os.path.dirname(__file__), "dat", "U4VGA.pal"), "rb"
@@ -206,26 +196,97 @@ def make_png_bytes(width, height, pixels):
     output_chunk(out, "IEND", b"")
     return out.getvalue()
 
+
 def make_image_from_pixels(pixels):
-    height = width = (16 if len(pixels) == (16 * 16) else 32 if len(pixels) == (32 * 32) else -1)
-    assert -1 not in (height, width), f"Invalid pixel count, cannot determine HxW: {len(pixels)}"
+    height = width = (
+        16 if len(pixels) == (16 * 16) else 32 if len(pixels) == (32 * 32) else -1
+    )
+    assert -1 not in (
+        height,
+        width,
+    ), f"Invalid pixel count, cannot determine HxW: {len(pixels)}"
     pbdata = make_png_bytes(width, height, pixels)
     return PIL.Image.open(io.BytesIO(pbdata))
 
 
-# if __name__ == "__main__":
-#    from png import write_png
-#
-#    shapes = load_shapes_vga()
-#    scale_factor = 4
-#    for tile_num in range(len(shapes)):
-#        print(shapes[tile_num])
-#        image = scale(shapes[tile_num], scale_factor)
-#        print(image)
-#        #write_png(
-#            f"images/tile_{tile_num:02X}.png",
-#            16 * scale_factor,
-#            16 * scale_factor,
-#            image,
-#        )
-#
+
+# --- offline functions, only, run once to create qwack/dat/sf*.zip files ---
+
+@contextlib.contextmanager
+def elapsed_timer():
+    """Timer pattern, from https://stackoverflow.com/a/30024601."""
+    start = timeit.default_timer()
+
+    def elapser():
+        return timeit.default_timer() - start
+
+    # pylint: disable=unnecessary-lambda
+    yield lambda: elapser()
+
+
+# Define the function to be executed in parallel
+def process_shape_file(sf):
+    load_fn = load_shapes_ega if sf["mode"].upper() == "EGA" else load_shapes_vga
+    shape_data = load_fn(sf["filename"])
+    # each zip file for each shapefile character set contains
+    # yaml files as {tile_size}.yaml, containing a dictionary
+    # keyed by tile_id (0-255), with a value of a list of strings,
+    # the result of make_ansi_txt_tile in all permutations of darkness.
+    zip_filepath = os.path.join(os.path.dirname(__file__), 'dat', f'{sf["name"]}.zip')
+    import zipfile
+    import yaml
+
+    result = {}
+    if os.path.exists(zip_filepath):
+        os.remove(zip_filepath)
+    print(f'BEGIN {zip_filepath}')
+    zip_file = zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED, compresslevel=1)
+
+    min_tile_size = 2
+    max_tile_size = 16
+    with elapsed_timer() as elapsed_sf:
+        for tile_size in range(min_tile_size, max_tile_size):
+            with elapsed_timer() as elapsed_tile:
+                for tile_id in range(len(shape_data)):
+                    # do not generate "darkest" color, 
+                    darkness_levels = range(0, MAX_DARKNESS_LEVEL)
+                    result[tile_id] = [
+                        {
+                            "darkness": darkness,
+                            "value": make_ansi_txt_tile(
+                                shape_data, tile_id, tile_size, tile_size, darkness=darkness, max_darkness_level=MAX_DARKNESS_LEVEL + 1)
+                        }
+                        for darkness in darkness_levels
+                    ]
+                zip_file.writestr(f"{tile_size}.yaml", yaml.dump(result))
+            print(f"Completed {sf["mode"]} mod from {sf["filename"]}, libchafa tile_size {tile_size} in {elapsed_tile():.2f} seconds.")
+        zip_file.close()
+    print(f'Completed {sf["mode"]} ShapeFile {"filename"} in {elapsed_sf():.2f} seconds.')
+    print(f'END {zip_filepath}')
+
+
+def make_all_tiles():
+    import multiprocessing, yaml
+    num_cores = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(num_cores)
+    FPATH_WORLD_YAML = os.path.join(os.path.dirname(__file__), "dat", "world.yaml")
+    world_data = yaml.load(open(FPATH_WORLD_YAML, "r"), Loader=yaml.SafeLoader)
+
+    # Apply the function to each shape file using multiple processes
+    pool.map(process_shape_file, world_data["ShapeFiles"])
+
+    # Close the pool of processes
+    pool.close()
+    pool.join()
+
+if __name__ == "__main__":
+    make_all_tiles()
+    #
+    # TODO: will re-add y_offset animation, and fg_image & bg_image
+    # combinations, later!  we just need to define which tiles are known to be
+    # "floor" tiles, and just permutate all creatures above them all, this
+    # greatly reduces the possible 255 * 255 space to something like estimated
+    # 32 * 32 (64x), this still allows us to have "darkness" *and* fg_image on
+    # bg_image, *and* y_offset animation for those few water tiles that support
+    # it!
+    # TODO: inverse!
