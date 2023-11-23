@@ -259,7 +259,7 @@ def process_shape_file(sf):
                         for darkness in darkness_levels
                     ]
                 zip_file.writestr(f"{tile_size}.yaml", yaml.dump(result))
-            print(f"Completed {sf["mode"]} mod from {sf["filename"]}, libchafa tile_size {tile_size} in {elapsed_tile():.2f} seconds.")
+            print(f'Completed {sf["mode"]} mod from {sf["filename"]}, libchafa tile_size {tile_size} in {elapsed_tile():.2f} seconds.')
         zip_file.close()
     print(f'Completed {sf["mode"]} ShapeFile {"filename"} in {elapsed_sf():.2f} seconds.')
     print(f'END {zip_filepath}')
