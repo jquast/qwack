@@ -290,8 +290,10 @@ class World(object):
         if world_0_items is None:
             world_0_items = cls.make_tile_items(0, world_data)
             assert map_id == 0
+            assert not (start_y or start_x or world_y or world_x)
             items = world_0_items
-            start_y, start_x = world_y, world_x
+            start_y = world_y = world_data['World']['start_y']
+            start_x = world_y = world_data['World']['start_x']
             # start player @ world british's castle
             items.append(Item.create_player(Position(y=107, x=86)))
         elif map_id == 0:
@@ -305,7 +307,8 @@ class World(object):
             # add npc's
             for npc_definition in u4_data.load_npcs_from_u4_ult_map(map_id, world_data):
                 items.append(Item(**npc_definition))
-        assert items
+            for npc_definition in world_data["Maps"][map_id].get("npcs", []):
+                items.append(Item(**npc_definition))
 
         return cls(
             Materials=enum.Enum("Material", world_data["Materials"]),
@@ -325,7 +328,13 @@ class World(object):
         # the entire world, anyway.
         items = []
         chunk_size = 32 if map_id == 0 else 1
-        map_chunks = u4_data.read_map(map_id)
+        if map_id and 'map_data' in world_data["Maps"][map_id]:
+            map_chunks = {}
+            for y, row in enumerate(world_data["Maps"][map_id]['map_data']):
+                for x, tile_id in enumerate(row):
+                    map_chunks[y, x] = [tile_id]
+        else:
+            map_chunks = u4_data.read_map(map_id)
         for (chunk_y, chunk_x), chunk_data in map_chunks.items():
             for idx, raw_val in enumerate(chunk_data):
                 div_y, div_x = divmod(idx, chunk_size)
@@ -937,10 +946,9 @@ class Viewport:
 
         occlusions = collections.defaultdict(list)
         # XXX this is probably the most expensive lookup, of ~65,500 items
-        # how much faster would it be if we used SQLITE, which had optimized
-        # indicies for (X, Y) lookups, or is there a python equivalent we
-        # aren't using? and, we should drop 'z', and index everything by
-        # (Y, X) naturally with values of items.
+        # how much faster would it be if we used an index items[(Y, X)] !!
+        # this is approximately 2x slower in World than in Map, and yet,
+        # it is now fast enough, it doesn't matter a whole lot ...
         for item in sorted(
             filter(fn_culling, world.items), key=sort_func, reverse=False
         ):
@@ -1229,3 +1237,64 @@ if __name__ == "__main__":
 # uppercase to avoid conflict:
 #
 # 'E'nter, 'C'ast, 'K'limb, 'D'escend, 
+
+#
+# Best tile sizes (expunge the rest!)
+# - 2,3,6,8,12,16.
+
+
+# Ideas,
+#
+# This could be a real game, shipped to customers, by simply wrapping
+# any open-sourced/MIT-licensed terminal emulator and adding sound
+# and music.. we can make something basically fully open source (no
+# attempts to obfuscate our code) and sell online for money.
+#
+# "Fantastic Voyage", a rogue-like inside the human body, various quests
+# for each major organ, large "battles" involving white blood cells etc.,
+# inspiration from manga, "Cells at Work!" you are one of so many classes,
+# you could be a a white blood cell, macrophage, a helper T cell,
+# etc.
+#
+# "Sword of the Samurai", this is the perfect engine to implement our SotS
+# multiplayer concept. kkkkkkk
+#
+# "Ultima IV meets Pirates! and becomes rogue-like"
+# - procedurally generated dungeons, try for something a bit more "moody", like
+#   ultima 7 and esp. ultima 8 dungeons, than nethack.
+# - the *worst* parts of nethack, are too many combinations and things to know,
+#   modern players don't have the patience to learn it the hard way or source dive
+#   the *best* part of ultima IV, is so few *things* (other than spells), JUST
+#   the book, the candle, and the horn, only! The stones, the runes, everything
+#   is **explained in-game** very well
+# - the *best* parts of ultima is,
+#   - not having permadeth!
+#   - simpler game mechanics
+#   - spell reagent system
+# - the *best* parts of nethack is
+#   - getting v. attached to your player and your world
+#   - discovering new game mechanics, items, and using that to expand the
+#     previously explored world, like digging, or becoming powerful enough
+#     to murder all shopkeepers
+#   - **special levels**, I always wish for more, and more variety, be it
+#     a v. difficult mechanic, the first time finding special levels is
+#     exciting, frightening, intriguing, you never know what to expect,
+#     but you can tell right away that the level is different design
+#   - becoming god-like and blowing through the mid-game with ease
+# - the *best* parts of Pirates!
+#   - the courtship, marriage, joining sides, a "living world",
+#     hunting down a pirate in style of carmen sandiego, tresure
+#     fleet, etc.
+#   - having noteriaty
+#   - winds actually feel real, and challenging, "steering" the boat,
+#     not just in 8, i think it is 16 directions, sailing a boat into
+#     a harbor *should* be a bit tricky !!
+#   - economy! buying things, boarding a ship, taking it somewhere
+#     and selling it. Boarding a pirate ship, taking their loot,
+#     sinking and murdering or asking them to join your crew,
+#     the crew having demands of gold and their mutanty, etc.
+#     - wouldn't it be great, if you could be a pirate or a pirate
+#       hunter, and suffer the in-game consequences of valor,
+#       sacrafice, honesty, etc.
+#     - it would add an extra level of mid-game difficulty, it
+#       should become *harder*, not *easier* to sail?

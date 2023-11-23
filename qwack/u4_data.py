@@ -34,12 +34,15 @@ def read_u4_ult_map(fpath) -> dict[tuple[int, int], list[int]]:
     town_map_bytes = open(fpath, "rb").read(1024)
     for y in range(32):
         for x in range(32):
+            # this reads as an array, probably shouldn't ..
             world_chunks[y, x] = [town_map_bytes[(32 * y) + x]]
     return world_chunks
 
 
 def load_npcs_from_u4_ult_map(map_id: int, world_data: dict) -> list:
     """Returns NPCs as list of dictionaries compatible with Item."""
+    if map_id not in ULT_FILENAME_MAPPING:
+        return []
     fpath = os.path.join(
         os.path.dirname(__file__), "dat", ULT_FILENAME_MAPPING[map_id] + ".ULT"
     )
