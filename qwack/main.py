@@ -9,14 +9,15 @@ import random
 import math
 import time
 import os
+import zipfile
 
 # 3rd party
 import blessed
 import yaml
 
 # local
-import u4_data
-import u4_tiler
+from . import u4_data
+from . import u4_tiler
 
 echo = functools.partial(print, end="")
 Position = collections.namedtuple("Position", ("y", "x"))
@@ -36,11 +37,8 @@ def make_direction(y=0, x=0):
 # to their correct aspect ratio by CHAFA, '1' provides the best "circle" effect
 DEFAULT_RADIUS = 6
 VIS_RATIO = 1
-MAX_DARKNESS_LEVEL = 4
 TIME_ANIMATION_TICK = 0.20
 TIME_PLAYER_PASS = 23
-MIN_TILE_SIZE = 7
-MAX_TILE_SIZE = 29
 TEXT_HISTORY_LENGTH = 1000
 DEFAULT_TILE_SIZE = 16
 MAX_RADIUS = 9
@@ -54,7 +52,7 @@ SHAPE_TILE_SIZE = 32
 # probably better in the YAML, but gosh, lots of junk in "World" ?
 SHIP_TILE_DIRECTIONS = {16: "West", 17: "North", 18: "East", 19: "South"}
 DIRECTION_SHIP_TILES = {v: k for k, v in SHIP_TILE_DIRECTIONS.items()}
-DEFAULT_SHAPE_FILENAME = "jsteele-shapes.vga"
+DEFAULT_SHAPE_FILENAME = "jsteele-shapes.ega"
 
 @contextlib.contextmanager
 def elapsed_timer():
@@ -149,6 +147,15 @@ class Item(object):
     def is_flying(self):
         return self.tile_id == 24
 
+    @property
+    def is_ladder_up(self):
+        return self.tile_id == 27
+
+    @property
+    def is_ladder_down(self):
+        return self.tile_id == 28
+
+
     @pos.setter
     def pos(self, value):
         self._pos = value
@@ -189,20 +196,29 @@ class World(object):
     time = 0
     TICK = 1
     clipping = True
-    wizard_mode = False
+    wizard_mode = True
+    # state of location in world, for entering/exiting towns
+    world_y, world_x = 0, 0
 
     def __init__(
-        self, items=None, Materials=None, Where=None, Portals=None, world_data=None
+        self, world_0_items=None, items=None, Materials=None, Where=None, Portals=None, world_data=None,
+        world_y=None, world_x=None,
     ):
+        # this is just a basic copy of the mutated items in world_0 until we can find a save & restore
+        # system for mutated world items, as maps will also need this for "S"earching and finding items
+        # (by removing them from the map)
+        self.world_0_items = world_0_items
         self.Where = Where
         self.Materials = Materials
         self.Portals = Portals
         self.items = items or []
         self.world_data = world_data
+        self.world_y = world_y if world_y is not None else 0
+        self.world_x = world_x if world_x is not None else 0
 
         # bounding dimensions
-        self._height = max(item.y for item in items) if items else 0
-        self._width = max(item.x for item in items) if items else 0
+        self._height = max(item.y for item in self.items) if self.items else 0
+        self._width = max(item.x for item in self.items) if self.items else 0
 
         # cache lookup
         self._player = None
@@ -255,6 +271,12 @@ class World(object):
             return next(self.find_iter(**kwargs))
         except StopIteration:
             return None
+    
+    def find_one_not_player(self, **kwargs):
+        try:
+            return next(self.find_iter_not_player(**kwargs))
+        except StopIteration:
+            return None
 
     @property
     def player(self):
@@ -263,18 +285,27 @@ class World(object):
         return self._player
 
     @classmethod
-    def load(cls, map_id: int, world_data: dict):
-        # create from u4 map, join with "World Data" definitions from u4-world.yaml
-        items = cls.make_tile_items(map_id, world_data)
-        if map_id != -1:
+    def load(cls, world_0_items, map_id: int, world_data: dict, start_y=None, start_x=None, world_y=None, world_x=None):
+        # create from u4 map, or persist between world exits, etc.
+        if world_0_items is None:
+            world_0_items = cls.make_tile_items(0, world_data)
+            assert map_id == 0
+            items = world_0_items
+            start_y, start_x = world_y, world_x
+            # start player @ world british's castle
+            items.append(Item.create_player(Position(y=107, x=86)))
+        elif map_id == 0:
+            assert world_0_items
+            items = world_0_items
+        if map_id != 0:
+            assert None not in (start_y, start_x)
+            # load cities etc. always from file
+            items = cls.make_tile_items(map_id, world_data)
+            items.append(Item.create_player(Position(y=start_y, x=start_x)))
+            # add npc's
             for npc_definition in u4_data.load_npcs_from_u4_ult_map(map_id, world_data):
                 items.append(Item(**npc_definition))
-
-        if map_id == -1:
-            # Create the player, start @ Lord British's castle!
-            items.append(Item.create_player(Position(y=107, x=86)))
-        else:
-            items.append(Item.create_player(Position(y=0, x=0)))
+        assert items
 
         return cls(
             Materials=enum.Enum("Material", world_data["Materials"]),
@@ -282,12 +313,18 @@ class World(object):
             Portals=world_data["World"]["Portals"],
             items=items,
             world_data=world_data,
+            world_y=world_y,
+            world_x=world_x,
+            world_0_items=world_0_items,
         )
 
     @classmethod
-    def make_tile_items(cls, map_id, world_data):
+    def make_tile_items(cls, map_id: int, world_data):
+        # map_id of '0' means world map, which has a chunk_size of 32x32,
+        # we don't have concern for apple ][ memory restrictions and load
+        # the entire world, anyway.
         items = []
-        chunk_size = 32 if map_id == -1 else 1
+        chunk_size = 32 if map_id == 0 else 1
         map_chunks = u4_data.read_map(map_id)
         for (chunk_y, chunk_x), chunk_data in map_chunks.items():
             for idx, raw_val in enumerate(chunk_data):
@@ -310,7 +347,9 @@ class World(object):
                 items.append(item)
         return items
 
-    def do_move_player(self, viewport, y=0, x=0):
+    def do_move_player(self, viewport, y=0, x=0) -> tuple[bool, bool]:
+        # Returns whether the player moved, and screen should be refreshed,
+        # and, whether the player exited the map (dirty, do_exit)
         previous_pos = self.player.pos
         pos = Position(y=self.player.y + y, x=self.player.x + x)
         can_move = False
@@ -346,7 +385,9 @@ class World(object):
         if can_move:
             viewport.add_text(make_direction(y=y, x=x))
             self.player.pos = pos
-        return pos != previous_pos
+        do_exit = not viewport.small_world.find_one_not_player(pos=pos)
+        player_moved = pos != previous_pos
+        return player_moved, do_exit
 
     def do_open_door(self, viewport, y=0, x=0):
         # is there an (unlocked) door ?
@@ -367,7 +408,8 @@ class World(object):
         boat = self.find_one(name="boat", pos=self.player.pos)
         if not boat and self.wizard_mode:
             # wizards can "Board" any tile, LoL!
-            boat = next(self.find_iter_not_player(pos=self.player.pos))
+            items = list(self.find_iter_not_player(pos=self.player.pos))
+            boat = items[-1]
         elif not boat:
             viewport.add_text("Board WHAT?")
             return False
@@ -455,8 +497,8 @@ class World(object):
 
     def darkness(self, item):
         distance = item.distance(self.player)
-        fn_trim = math.ceil if not random.randrange(6) else math.floor
-        return fn_trim(min(max(0, distance - 2), MAX_DARKNESS_LEVEL))
+        fn_trim = math.ceil if not random.randrange(12) else math.floor
+        return fn_trim(min(max(0, distance - 2), u4_tiler.MAX_DARKNESS_LEVEL))
 
     def tick(self, small_world):
         # "tick" the engine forward and perform "AI",
@@ -509,52 +551,39 @@ class UInterface(object):
         # but maybe there needs to be another abstraction,
         # we will see..
         self.ShapeFiles = ShapeFiles
-        # todo: move to u4_tiler.py as Shapes.py
-        self.shape_data = self.load_shape_data(shape_filename)
         # because this uses "magic" in setter, set only after shape_data
-        self.tile_size = tile_size
+        # todo: move to u4_tiler.py as Shapes.py
+        self.init_shape_data(shape_filename, tile_size)
 
-    def load_shape_data(self, shape_filename):
-        load_fn = None
-        for sf in self.ShapeFiles:
-            if sf["filename"] == shape_filename:
-                load_fn = (u4_tiler.load_shapes_ega if sf["mode"] == "EGA" else 
-                           u4_tiler.load_shapes_vga)
-                # self.shapes_data = sf["shapes"]
-                break
-        if load_fn is None:
-            raise ValueError(f"No matching records by shape_filename={shape_filename!r}")
+    def init_shape_data(self, shape_filename, tile_size):
         self.shape_filename = shape_filename
-        return load_fn()
+        # update self.tile_size,
+        self.tile_size = min(max(tile_size, u4_tiler.MIN_TILE_SIZE), u4_tiler.MAX_TILE_SIZE)
+        for sf in self.ShapeFiles:
+            if sf["filename"] == self.shape_filename:
+                # then set shape_data,
+                self.shape_data = self.load_txt_shape_data(sf)
+                # and update tile_height from yaml data
+                self.tile_width = tile_size
+                self.tile_height = len(self.shape_data[0xFF][0]["value"])
+                return
+        raise ValueError(f"No matching records by filename={self.shape_filename!r}, ShapeFiles={self.ShapeFiles}")
+
+    def load_txt_shape_data(self, sf):
+        zipfile_name = f'{sf["name"]}.zip'
+        zipfile_path = os.path.join(os.path.dirname(__file__), "dat", zipfile_name)
+        yamlfile_name = f'{self.tile_size}.yaml'
+                # extract and load yaml data from yamlfile_name inside zipfile_name in-memory,
+        with zipfile.ZipFile(zipfile_path, 'r') as zip_ref:
+            return yaml.load(zip_ref.read(yamlfile_name), Loader=yaml.SafeLoader)
     
     def cycle_shapes(self):
         # given the current self.shape_filename, cycle to the next
         for idx in range(len(self.ShapeFiles)):
             if self.ShapeFiles[idx]["filename"] == self.shape_filename:
-                self.shape_filename = self.ShapeFiles[(idx + 1) % len(self.ShapeFiles)]["filename"]
-                self.reload_shapes()
+                shape_filename = self.ShapeFiles[(idx + 1) % len(self.ShapeFiles)]["filename"]
+                self.init_shape_data(shape_filename, self.tile_size)
                 return
-
-
-    @property
-    def tile_size(self):
-        return self._tile_size
-
-    @tile_size.setter
-    def tile_size(self, value):
-        self._tile_size = value
-        self.tile_width = value
-        # determine final tile height by encoding any tile and measuring returned tile height, so that
-        # we let CHAFA decide the best font "aspect ratio" for the given 16x16 tile
-        self.tile_height = len(
-            u4_tiler.make_tile(
-                self.shape_data,
-                tile_id=0xFF,
-                tile_width=value,
-                tile_height=value,
-                darkness=0,
-            )
-        )
 
     @property
     def window_size(self):
@@ -571,9 +600,20 @@ class UInterface(object):
                 self.dirty = world.do_open_door(viewport, **self.movement_map[inp])
                 self.waiting_open_direction = 0
             else:
-                self.dirty = world.do_move_player(viewport, **self.movement_map[inp])
-            # TODO: could return a new world, when exiting the current one
-            # world = world.maybe_exit(world)
+                self.dirty, do_exit = world.do_move_player(viewport, **self.movement_map[inp])
+                if do_exit:
+                    # TODO: track where we are! we can't exit the world map, either!
+                    viewport.add_text("Leaving XXX!")
+                    # all maps so far "exit" to the world map
+                    world = World.load(
+                        world_0_items=world.world_0_items,
+                        map_id=0,
+                        world_data=world.world_data,
+                        start_y=world.world_y,
+                        start_x=world.world_x,
+                        world_y=world.world_y,
+                        world_x=world.world_x,
+                    )
         elif self.waiting_open_direction:
             # invalid direction after "O"pen
             if inp:
@@ -583,13 +623,26 @@ class UInterface(object):
         elif inp == "o":
             viewport.add_text("Open-")
             self.waiting_open_direction = time.monotonic()
-        elif inp == "E":
-            # 'E'nter Portal
+        elif inp == "E" or inp == "K" or inp == "D":
+            # 'E'nter Portal or "K"limb ladder
             portal = world.find_portal(world.player.pos)
-            if portal:
+            item = world.find_one_not_player(pos=world.player.pos)
+            can_enter = (portal and
+                         item.is_ladder_up and inp == "K" or
+                         item.is_ladder_down and inp == "D" or
+                         portal and inp == "E")
+            if can_enter:
+                map_name = world.world_data["Maps"][portal["dest_id"]]["name"]
+                viewport.add_text(map_name.upper().center(15))
                 viewport.dirty = True
                 world = World.load(
-                    map_id=portal["dest_id"], world_data=world.world_data
+                    world_0_items=world.items,
+                    map_id=portal["dest_id"],
+                    world_data=world.world_data,
+                    start_x=portal["start_x"],
+                    start_y=portal["start_y"],
+                    world_y=world.world_y,
+                    world_x=world.world_x,
                 )
         elif inp == "B":
             # 'B'oard ship or mount horse
@@ -597,10 +650,10 @@ class UInterface(object):
         elif inp == "X":
             # e 'X'it ship or unmount horse
             self.dirty = world.exit_ship_or_unmount_horse(viewport)
-        elif inp == "{" and self.tile_size > MIN_TILE_SIZE:
-            self.tile_size -= 2
-        elif inp == "}" and self.tile_size < MAX_TILE_SIZE:
-            self.tile_size += 2
+        elif inp == "{" and self.tile_size > u4_tiler.MIN_TILE_SIZE:
+            self.init_shape_data(self.shape_filename, self.tile_size - 1)
+        elif inp == "}" and self.tile_size < u4_tiler.MAX_TILE_SIZE:
+            self.init_shape_data(self.shape_filename, self.tile_size + 1)
         elif inp == "\x17":  # Control-W
             world.wizard_mode = not world.wizard_mode
             _enabled = {"enabled" if world.wizard_mode else "disabled"}
@@ -619,6 +672,8 @@ class UInterface(object):
                 self.darkness = not self.darkness
                 _enabled = {"enabled" if world.darkness else "disabled"}
                 viewport.add_text(f"Darkness {_enabled}")
+            elif inp == "\x12":  # ^R
+                self.cycle_shapes()
             elif inp == ")" and self.radius is not None and self.radius < MAX_RADIUS:
                 self.radius += 1
             elif inp == "(" and self.radius is not None and self.radius >= 2:
@@ -639,11 +694,11 @@ class UInterface(object):
 
     def auto_resize(self, viewport):
         if self.radius:
-            while self.tile_size < MAX_TILE_SIZE and (
+            while self.tile_size > u4_tiler.MIN_TILE_SIZE and (
                 ((self.radius) * 2) + 2 > (viewport.width / self.tile_size) - 1
             ):
                 self.dirty = True
-                self.tile_size -= 2
+                self.tile_size -= 1
                 viewport.add_text(
                     f"resize tile -1, ={self.tile_size}, "
                     f"viewport_width={viewport.width}, "
@@ -651,11 +706,11 @@ class UInterface(object):
                     f"tile_height={self.tile_height}, "
                     f"radius * 2={self.radius * 2}, "
                 )
-            while self.tile_size > MIN_TILE_SIZE and (
+            while self.tile_size < u4_tiler.MAX_TILE_SIZE and (
                 (self.radius * 2) + 2 < (viewport.width / self.tile_size)
             ):
                 self.dirty = True
-                self.tile_size += 2
+                self.tile_size += 1
                 viewport.add_text(
                     f"resize tile +1, ={self.tile_size}, "
                     f"viewport_width={viewport.width}, "
@@ -672,14 +727,13 @@ class UInterface(object):
 
     def debug_details(self):
         return {
-#            "tiler-misses": u4_tiler.make_tile.cache_info().misses,
-#            "tiler-hits": u4_tiler.make_tile.cache_info().hits,
             "tile-width": self.tile_width,
             "tile-height": self.tile_height,
             "radius": self.radius,
             "darkness": self.darkness,
             "term-height": self.term.height,
             "term-width": self.term.width,
+            f"shape": self.shape_filename,
         }
 
     def render_text(self, viewport, debug_details):
@@ -759,23 +813,22 @@ class UInterface(object):
                     actual_xpos = xpos + viewport.xoffset
                     if items:
                         # todo: an ItemsCollection should have 'foreground' and 'background'
-                        bg_tile_id = None
-                        if len(items) > 1:
-                            bg_tile_id = items[-1].tile_id
+#                        bg_tile_id = None
+#                        if len(items) > 1:
+#                            bg_tile_id = items[-1].tile_id
                         tile_darkness = (
                             viewport.small_world.darkness(items[0])
                             if self.darkness
                             else 0
                         )
-                        tile_ans = u4_tiler.make_tile(
+                        tile_ans = u4_tiler.get_ansi_txt_tile(
                             self.shape_data,
                             items[0].tile_id,
                             tile_width=self.tile_width,
                             tile_height=self.tile_height,
-                            y_offset=items[-1].get_animation_y_offset(world),
+#                            # y_offset=items[-1].get_animation_y_offset(world),
                             darkness=tile_darkness,
-                            max_darkness_level=MAX_DARKNESS_LEVEL,
-                            bg_tile_id=bg_tile_id,
+#                            # bg_tile_id=bg_tile_id,
                         )
                         for ans_y, ans_txt in enumerate(tile_ans):
                             actual_ypos = ypos + ans_y + viewport.yoffset
@@ -1048,7 +1101,7 @@ def _loop(ui, world, viewport):
 
 
 def init_begin_world(world_data):
-    world = World.load(map_id=-1, world_data=world_data)
+    world = World.load(world_0_items=None, map_id=0, world_data=world_data)
 
     # Add test boat!
     world.items.append(Item.create_boat(Position(y=110, x=86)))

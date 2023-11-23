@@ -8,16 +8,17 @@ Materials:
     - construction
 
 Where:
-    # descending top-down occlusion order
+    # descending top-down occlusion order, this could be simplified, we
+    # will sometimes need at least 3 tiles for "hidden" items undernearth
+    # a tile that is searched, for example, and a 3rd layer for creatures.
     - unattached
     - floor
     - buried
 
 ShapeFiles:
- - {"mode": "ega", "filename": "SHAPES.EGA", "description": "DOS EGA set"}
- - {"mode": "vga", "filename": "SHAPES.VGA", "description": "Ultima IV Upgrade (v1.3)"}
- - {"mode": "ega", "filename": "jsteele-shapes.ega", "description": "EGA by github.com/jahshuwaa"}
- - {"mode": "vga", "filename": "jsteele-shapes.vga", "description": "VGA by github.com/jahshuwaa"}
+ - {"mode": "ega", "name": "sf1", "filename": "SHAPES.EGA", "description": "DOS EGA set"}
+ - {"mode": "ega", "name": "sf3", "filename": "jsteele-shapes.ega", "description": "EGA by github.com/jahshuwaa"}
+ - {"mode": "vga", "name": "sf4", "filename": "jsteele-shapes.vga", "description": "VGA by github.com/jahshuwaa"}
 
 
 Shapes:
