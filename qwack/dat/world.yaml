@@ -1,0 +1,1296 @@
+Materials:
+    - fire
+    - liquid
+    - mud
+    - soil
+    - stone
+    - plant
+    - construction
+
+Where:
+    # descending top-down occlusion order, this could be simplified, we
+    # will sometimes need at least 3 tiles for "hidden" items undernearth
+    # a tile that is searched, for example, and a 3rd layer for creatures.
+    - unattached
+    - floor
+    - buried
+
+ShapeFiles:
+ - {"mode": "ega", "name": "sf1", "filename": "SHAPES.EGA", "description": "DOS EGA set"}
+ - {"mode": "ega", "name": "sf3", "filename": "jsteele-shapes.ega", "description": "EGA by github.com/jahshuwaa"}
+ - {"mode": "vga", "name": "sf4", "filename": "jsteele-shapes.vga", "description": "VGA by github.com/jahshuwaa"}
+
+
+Shapes:
+    # Shape definitions of textures, used by WORLD.DAT
+    # or town.ULT, etc. of Ultima IV
+    #
+    # each integer type could map to any number of items,
+    # keyed unique by unique 'where', though
+    0:
+            name: Deep Water
+            material: liquid
+            land_passable: no
+    1:
+            name: Medium Water
+            material: liquid
+            land_passable: no
+    2:
+            name: Shallow Water
+            material: liquid
+            water_passable: no
+            land_passable: no
+    3:
+            name: Swamp
+            material: mud
+            speed: 8
+    4:
+            name: Grasslands
+            material: plant
+    5:
+            name: Scrubland
+            material: plant
+            speed: 4
+    6:
+            name: Forest
+            material: plant
+            darkness: 1
+
+    7:
+            maerial: soil
+            name: Hills
+            speed: 2
+    8:
+            name: mountain
+            material: stone
+            land_passable: no
+            darkness: 1
+    9:
+            name: mountain door
+    10:
+            name: city
+    11:
+            name: castle
+    12:
+            name: village
+    13:
+            name: LCB_Left
+            land_passable: no
+    14:
+            name: LCB_Center
+    15:
+            name: LCB_Right
+            land_passable: no
+    16:
+            name: ship_west
+    17:
+            name: ship_north
+    18:
+            name: ship_east
+    19:
+            name: ship_south
+    20:
+            name: horse_west    
+    21:
+            name: horse_east
+    22:
+            name: tile_floor
+    23:
+            name: bridge
+    24:
+            name: balloon
+    25:
+            name: bridge_north
+    26:
+            name: bridge_south
+    27:
+            name: Ladder Up
+    28:
+            name: Ladder Down
+    29:
+            name: ruin
+            material: stone
+    30:
+            name: shrine
+            material: stone
+    31:
+            name: Avatar
+            darkness: 1
+    32:
+            name: Mage 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    33:
+            name: Mage 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    34:
+            name: Bard 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    35:
+            name: Bard 2   
+            darkness: 1
+            material: flesh
+            land_passable: no
+    36:
+            name: Fighter 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    37:
+            name: Fighter 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    38:
+            name: Druid 1  
+            darkness: 1
+            material: flesh
+            land_passable: no
+    39:
+            name: Druid 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    40:
+            name: Tinker 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    41:
+            name: Tinker 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    42:
+            name: Paladin 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    43:
+            name: Paladin 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    44:
+            name: Ranger 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    45:
+            name: Ranger 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    46:
+            name: Shepherd 1
+            darkness: 1
+            material: flesh
+            land_passable: no
+    47:
+            name: Shepherd 2
+            darkness: 1
+            material: flesh
+            land_passable: no
+    48: 
+            name: Column
+            land_passable: no  
+            darkness: 1
+    49:
+            name: White SW
+            darkness: 1
+    50:
+            name: White SE
+            darkness: 1
+    51:
+            name: White NE
+            darkness: 1
+    52:
+            name: White NW
+            darkness: 1
+    53:
+            name: Mast
+            darkness: 1
+    54:
+            name: Ship's Wheel
+    55:
+            name: Rocks
+    56:
+            name: Lyin Down
+    57:
+            name: Stone Wall
+            land_passable: no
+            darkness: 1
+    58:
+            name: Locked Door
+            land_passable: no
+            darkness: 1
+    59:
+            name: Unlocked Door
+            land_passable: no
+            darkness: 1
+    60:
+            name: Chest
+    61:
+            name: Ankh
+            land_passable: no
+    62:
+            name: Brick Floor
+    63:
+            name: Wooden Planks
+    68:
+            name: Poison Field
+            material: liquid 
+    69:
+            name: Energy Field
+            material: fire
+    70:
+            name: Fire Field
+            material: fire
+            speed: 2
+    71:
+            name: Sleep Field
+            material: fire
+            speed: 2
+    72:
+            name: Solid Barrier
+            land_passable: no
+            darkness: 1
+    73:
+            name: Hidden Passage
+            darkness: 1
+    75:
+                name: Spit
+                material: fire
+    76:
+            name: Lava Flow
+            material: fire
+    77:
+                name: Missile
+                material: fire
+    78:
+                name: Magic Sphere
+                material: fire
+    79:
+                name: Attack Flash
+                material: fire
+    80:
+                name: Guard 1
+                darkness: 1
+    81:
+                name: Guard 2
+                darkness: 1
+    82:
+                name: Citizen 1
+                darkness: 1
+    83:
+                name: Citizen 2
+                darkness: 1
+    84:
+                name: Singing Bard 1
+                darkness: 1
+    85:
+                name: Singing Bard 2
+                darkness: 1
+    86:
+                name: Jester 1
+                darkness: 1
+    87:
+                name: Jester 2
+                darkness: 1
+    88:
+                name: Beggar 1
+                darkness: 1
+    89:
+                name: Beggar 2
+                darkness: 1
+    90:
+                name: Child 1
+                darkness: 1
+    91:
+                name: Child 2
+                darkness: 1
+    92:
+                name: Bull 1
+                darkness: 1
+    93:
+                name: Bull 2
+                darkness: 1
+    94:
+                name: Lord British 1
+                darkness: 1
+    95:
+                name: Lord British 2
+                darkness: 1
+    96:
+            name: A
+            land_passable: no
+    97:
+            name: B
+            land_passable: no
+    98:
+            name: C
+            land_passable: no
+    99:
+            name: D
+            land_passable: no
+    100:
+            name: E
+            land_passable: no
+    101:
+            name: F
+            land_passable: no
+    102:
+            name: G
+            land_passable: no
+    103:
+            name: H
+            land_passable: no
+    104:
+            name: I
+            land_passable: no
+    105:
+            name: J
+            land_passable: no
+    106:
+            name: K
+            land_passable: no
+    107:
+            name: L
+            land_passable: no
+    108:
+            name: M
+            land_passable: no
+    109:
+            name: N
+            land_passable: no
+    110:
+            name: O
+            land_passable: no
+    111:
+            name: P
+            land_passable: no
+    112:
+            name: Q
+            land_passable: no
+    113:
+            name: R
+            land_passable: no
+    114:
+            name: S
+            land_passable: no
+    115:
+            name: T
+            land_passable: no
+    116:
+            name: U
+            land_passable: no
+    117:
+            name: V
+            land_passable: no
+    118:
+            name: W
+            land_passable: no
+    119:
+            name: X
+            land_passable: no
+    120:
+            name: Y
+            land_passable: no
+    121:
+            name: Z
+            land_passable: no
+    122:
+            name: Space
+            land_passable: no
+    123:
+            name: Right
+            land_passable: no
+    124:
+            name: Left
+            land_passable: no
+    125:
+            name: Window
+            land_passable: no
+    126:
+            name: Blank
+            land_passable: no
+    127:
+            name: Brick Wall
+            land_passable: no
+            darkness: 1
+
+
+World:
+        map_filename: 'world.map'
+        special_items:
+                - { name: "balloon",     y: 233, x: 242 }
+                - { name: "lockelake",   y: 127, x: 78 }
+                - { name: "mandrake1",   y: 182, x: 54 }
+                - { name: "mandrake2",   y: 100, x: 165 }
+                - { name: "nightshade1", y: 46,  x: 149 }
+                - { name: "nightshade2", y: 205, x: 44 }
+                - { name: "bell",        y: 176, x: 208 }
+                - { name: "horn",        y: 45,  x: 173 }
+                - { name: "wheel",       y: 96,  x: 215 }
+                - { name: "skull",       y: 197, x: 245 }
+                - { name: "blackstone",  y: 224, x: 133 }
+                - { name: "whitestone",  y: 64,  x: 80 }
+        Portals:
+                - { "x":  86, "y": 107, "z": 0, "start_x": 15, "start_y": 30, "start_z": 0, "dest_id":  1 }
+                - { "x": 218, "y": 107, "z": 0, "start_x": 15, "start_y": 30, "start_z": 0, "dest_id":  2 }
+                - { "x":  28, "y":  50, "z": 0, "start_x": 15, "start_y": 30, "start_z": 0, "dest_id":  3 }
+                - { "x": 146, "y": 241, "z": 0, "start_x": 15, "start_y": 30, "start_z": 0, "dest_id":  4 }
+                - { "x": 232, "y": 135, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  5 }
+                - { "x":  82, "y": 106, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  6 }
+                - { "x":  36, "y": 222, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  7 }
+                - { "x":  58, "y":  43, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  8 }
+                - { "x": 159, "y":  20, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  9 }
+                - { "x": 106, "y": 184, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  10 }
+                - { "x":  22, "y": 128, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  11 }
+                - { "x": 187, "y": 169, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  12 }
+                - { "x":  98, "y": 145, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  13 }
+                - { "x": 136, "y": 158, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  14 }
+                - { "x": 201, "y":  59, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  15 }
+                - { "x": 136, "y":  90, "z": 0, "start_x": 1,  "start_y": 15, "start_z": 0, "dest_id":  16 }
+                - { "x": 240, "y":  73, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  17 }
+                - { "x":  91, "y":  67, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  18 }
+                - { "x":  72, "y": 168, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  19 }
+                - { "x": 126, "y":  20, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  20 }
+                - { "x": 156, "y":  27, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  21 }
+                - { "x":  58, "y": 102, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  22 }
+                - { "x": 239, "y": 240, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  23 }
+                - { "x": 233, "y": 233, "z": 0, "start_x": 1,  "start_y": 1, "start_z": 0, "dest_id":  24 }
+                - { "x": 233, "y":  66, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  25 }
+                - { "x": 128, "y":  92, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  26 }
+                - { "x":  36, "y": 229, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  27 }
+                - { "x":  73, "y":  11, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  28 }
+                - { "x": 205, "y":  45, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  29 }
+                - { "x":  81, "y": 207, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  30 }
+                # ah! what happened to #31 ! is it a secret place ??
+                - { "x": 231, "y": 216, "z": 0, "start_x": 0,  "start_y": 0, "start_z": 0, "dest_id":  32 }
+
+
+Maps:
+  # Map 1 1 lcb_1.ult 1,32,32,1 0,0,1,9
+  #     city "Britannia" "lcb.tlk" castle [10,29 15,30 ]
+  #   (
+  #     3,3,0 3,3,0 0x2 0x1 56 0,0
+  #     27,3,0 27,3,0 0x2 0x1 56 0,0
+  #     ra-dest [239,240,0 0]    7,2,0 5,5,0 0x4 0x1 23 0,0
+  #   )
+  1:
+     type: city
+     tlk_filename: lcb_1.tlk
+     border_behavior: 1
+     city_type: castle
+     name: Britannia
+     person_role_to_ids:
+        - [ 10, 29 ]
+        - [ 15, 30 ]
+     Portals:
+        - { "x":  3, "y":  3, "z": 0, "start_x": 3, "start_y": 3, "start_z": 0, "dest_id": 56 }
+  # Map 56 1 lcb_2.ult 1,32,32,1 0,0,1,9
+  # city "Britannia" "lcb.tlk" castle [14,32 ]
+  # (
+  #   3,3,0 3,3,0 0x4 0x1 1 0,0
+  #   27,3,0 27,3,0 0x4 0x1 1 0,0
+  # )
+  56:
+        type: city
+        tlk_filename: lcb_2.tlk
+        border_behavior: 1
+        city_type: castle
+        name: Britannia
+        person_role_to_ids:
+           - [ 14, 32 ]
+        Portals:
+           - { "x":  3,  "y": 3, "z": 0, "start_x": 3,  "start_y": 3, "start_z": 0, "dest_id": 1 }
+           - { "x":  27, "y": 3, "z": 0, "start_x": 27, "start_y": 3, "start_z": 0, "dest_id": 1 }
+
+  # Map 2 1 lycaeum.ult 1,32,32,1 0,0,1,9
+  #     city "Lycaeum" "lycaeum.tlk" castle [10,23 ]
+  #     (book 6,6,0 telescope 22,3,0 )
+  2:
+        type: city
+        tlk_filename: lycaeum.tlk
+        border_behavior: 1
+        city_type: castle
+        name: Lycaeum
+        person_role_to_ids:
+           - [ 10, 23 ]
+        special_items:
+           - { name: "book",       y: 6, x: 6, z: 0}
+           - { name: "telescope", y: 22, x: 3, z: 0}
+  # Map 3 1 empath.ult 1,32,32,1 0,0,1,9
+  #     city "Empath Abbey" "empath.tlk" castle [10,30 ]
+  #     (mysticarmor 22,4,0 )
+  3:
+        type: city
+        tlk_filename: empath.tlk
+        border_behavior: 1
+        city_type: castle
+        name: Empath Abbey
+        person_role_to_ids:
+           - [ 10, 30 ]
+        special_items:
+           - { name: "mysticarmor", y: 22, x: 4, z: 0}
+  # Map 4 1 serpent.ult 1,32,32,1 0,0,1,9
+  #     city "Serpents Hold" "serpent.tlk" castle [10,31 ]
+  #     (mysticswords 8,15,0 )
+  4:
+        type: city
+        tlk_filename: serpent.tlk
+        border_behavior: 1
+        city_type: castle
+        name: Serpents Hold
+        person_role_to_ids:
+           - [ 10, 31 ]
+        special_items:
+           - { name: "mysticswords", y: 8, x: 15, z: 0}
+  # Map 5 1 moonglow.ult 1,32,32,1 0,0,1,2
+  #     city "Moonglow" "moonglow.tlk" towne [4,32 7,26 9,24 10,25 11,30 ]
+  #     (honestyrune 8,6,0 )
+  5:
+        type: city
+        tlk_filename: moonglow.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Moonglow
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 7, 26 ]
+           - [ 9, 24 ]
+           - [ 10, 25 ]
+           - [ 11, 30 ]
+        special_items:
+           - { name: "honestyrune", y: 8, x: 6, z: 0}
+  # Map 6 1 britain.ult 1,32,32,1 0,0,1,2
+  #     city "Britain" "britain.tlk" towne [4,32 5,29 6,28 7,27 8,26 10,31 11,25 ]
+  #     (compassionrune 25,1,0 )
+  6:
+        type: city
+        tlk_filename: britain.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Britain
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 5, 29 ]
+           - [ 6, 28 ]
+           - [ 7, 27 ]
+           - [ 8, 26 ]
+           - [ 10, 31 ]
+           - [ 11, 25 ]
+        special_items:
+           - { name: "compassionrune", y: 25, x: 1, z: 0}
+  # Map 7 1 jhelom.ult 1,32,32,1 0,0,1,2
+  #     city "Jhelom" "jhelom.tlk" towne [4,32 5,29 6,28 8,30 10,25 10,26 10,27 11,31 ]
+  #     (valorrune 30,30,0 )
+  7:
+        type: city
+        tlk_filename: jhelom.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Jhelom
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 5, 29 ]
+           - [ 6, 28 ]
+           - [ 8, 30 ]
+           - [ 10, 25 ]
+           - [ 10, 26 ]
+           - [ 10, 27 ]
+           - [ 11, 31 ]
+        special_items:
+           - { name: "valorrune", y: 30, x: 30, z: 0}
+  # Map 8 1 yew.ult 1,32,32,1 0,0,1,2
+  #     city "Yew" "yew.tlk" towne [4,32 7,27 10,26 ]
+  #     (justicerune 13,6,0 )
+  8:
+        type: city
+        tlk_filename: yew.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Yew
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 7, 27 ]
+           - [ 10, 26 ]
+        special_items:
+           - { name: "justicerune", y: 13, x: 6, z: 0}
+  # Map 9 1 minoc.ult 1,32,32,1 0,0,1,2
+  #     city "Minoc" "minoc.tlk" towne [4,32 5,30 11,31 ]
+  #     (sacrificerune 28,30,0 )
+  9:
+        type: city
+        tlk_filename: minoc.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Minoc
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 5, 30 ]
+           - [ 11, 31 ]
+        special_items:
+           - { name: "sacrificerune", y: 28, x: 30, z: 0}
+  # Map 10 1 trinsic.ult 1,32,32,1 0,0,1,2
+  #     city "Trinsic" "trinsic.tlk" towne [4,32 5,29 6,28 8,31 11,30 ]
+  #     (honorrune 2,29,0 )
+  10:
+        type: city
+        tlk_filename: trinsic.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Trinsic
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 5, 29 ]
+           - [ 6, 28 ]
+           - [ 8, 31 ]
+           - [ 11, 30 ]
+        special_items:
+           - { name: "honorrune", y: 2, x: 29, z: 0}
+  # Map 11 1 skara.ult 1,32,32,1 0,0,1,2
+  #     city "Skara Brae" "skara.tlk" towne [4,32 7,28 9,30 10,31 11,29 ]
+  11:
+        type: city
+        tlk_filename: skara.tlk
+        border_behavior: 1
+        city_type: towne
+        name: Skara Brae
+        person_role_to_ids:
+           - [ 4, 32 ]
+           - [ 7, 28 ]
+           - [ 9, 30 ]
+           - [ 10, 31 ]
+           - [ 11, 29 ]
+  # Map 12 1 magincia.ult 1,32,32,1 0,0,1,2
+  #     city "Magincia" "magincia.tlk" ruins [4,32 ]
+  12:
+        type: city
+        tlk_filename: magincia.tlk
+        border_behavior: 1
+        city_type: ruins
+        name: Magincia
+        person_role_to_ids:
+           - [ 4, 32 ]
+  # Map 13 1 paws.ult 1,32,32,1 0,0,1,2
+  #     city "Paws" "paws.tlk" village [6,27 7,31 8,30 8,29 9,28 13,18 ]
+  #     (humilityrune 29,29,0 )
+  13:
+        type: city
+        tlk_filename: paws.tlk
+        border_behavior: 1
+        city_type: village
+        name: Paws
+        person_role_to_ids:
+           - [ 6, 27 ]
+           - [ 7, 31 ]
+           - [ 8, 30 ]
+           - [ 8, 29 ]
+           - [ 9, 28 ]
+           - [ 13, 18 ]
+        special_items:
+           - { name: "humilityrune", y: 29, x: 29, z: 0}
+  # Map 14 1 den.ult 1,32,32,1 0,0,1,2
+  #     city "Buccaneers Den" "den.tlk" village [5,28 6,27 8,26 9,30 12,29 ]
+  14:
+        type: city
+        tlk_filename: den.tlk
+        border_behavior: 1
+        city_type: village
+        name: Buccaneers Den
+        person_role_to_ids:
+           - [ 5, 28 ]
+           - [ 6, 27 ]
+           - [ 8, 26 ]
+           - [ 9, 30 ]
+           - [ 12, 29 ]
+  # Map 15 1 vesper.ult 1,32,32,1 0,0,1,2
+  #     city "Vesper" "vesper.tlk" village [5,25 8,23 11,26 12,24 ]
+  15:
+        type: city
+        tlk_filename: vesper.tlk
+        border_behavior: 1
+        city_type: village
+        name: Vesper
+        person_role_to_ids:
+           - [ 5, 25 ]
+           - [ 8, 23 ]
+           - [ 11, 26 ]
+           - [ 12, 24 ]
+  # Map 16 1 cove.ult 1,32,32,1 0,0,1,2
+  #     city "Cove" "cove.tlk" village [10,31 ]
+  #     (candle 22,1,0 )
+  16:
+        type: city
+        tlk_filename: cove.tlk
+        border_behavior: 1
+        city_type: village
+        name: Cove
+        person_role_to_ids:
+           - [ 10, 31 ]
+        special_items:
+           - { name: "candle", y: 22, x: 1, z: 0}
+
+
+Creatures:
+  0:
+    name: "Horse"
+    tile: 20
+    basehp: 255
+    exp: 10
+    good: true
+    wontattack: true
+  1:
+    name: "Horse"
+    tile: 20
+    basehp: 255
+    exp: 10
+    good: true
+    wontattack: true
+  2:
+    name: "Mage"
+    tile: 32
+    basehp: 112
+    exp: 8
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    good: true
+    wontattack: true
+  3:
+    name: "Bard"
+    tile: 34
+    basehp: 48
+    exp: 7
+    good: true
+    wontattack: true
+  4:
+    name: "Fighter"
+    tile: 36
+    basehp: 96
+    exp: 7
+    good: true
+    wontattack: true
+  5:
+    name: "Druid"
+    tile: 38
+    basehp: 64
+    exp: 10
+    good: true
+    wontattack: true
+  6:
+    name: "Tinker"
+    tile: 40
+    basehp: 96
+    exp: 9
+    good: true
+    wontattack: true
+  7:
+    name: "Paladin"
+    tile: 42
+    basehp: 128
+    exp: 4
+    good: true
+    wontattack: true
+  8:
+    name: "Ranger"
+    tile: 44
+    basehp: 144
+    exp: 3
+    good: true
+    wontattack: true
+  9:
+    name: "Shepherd"
+    tile: 46
+    basehp: 48
+    exp: 9
+    good: true
+    wontattack: true
+  10:
+    name: "Guard"
+    tile: 80
+    basehp: 128
+    exp: 13
+    good: true
+    wontattack: true
+  11:
+    name: "Merchant"
+    tile: 82
+    basehp: 48
+    exp: 9
+    good: true
+    wontattack: true
+  12:
+    name: "Bard"
+    tile: 84
+    basehp: 48
+    exp: 9
+    good: true
+    wontattack: true
+  13:
+    name: "Jester"
+    tile: 86
+    basehp: 48
+    exp: 9
+    good: true
+    wontattack: true
+  14:
+    name: "Beggar"
+    tile: 88
+    basehp: 32
+    exp: 13
+    good: true
+    wontattack: true
+  15:
+    name: "Child"
+    tile: 90
+    basehp: 32
+    exp: 10
+    good: true
+    wontattack: true
+  16:
+    name: "Bull"
+    tile: 92
+    basehp: 128
+    exp: 11
+    good: true
+  17:
+    name: "Lord British"
+    tile: 94
+    basehp: 255
+    exp: 16
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    good: true
+    wontattack: true
+  18:
+    encounterSize: 1
+    name: "Pirate Ship"
+    tile: 128
+    exp: 16
+    sails: true
+  19:
+    encounterSize: 12
+    name: "Nixie"
+    tile: 132
+    basehp: 64
+    exp: 5
+    ranged: true
+    swims: true
+    leader: 22
+  20:
+    encounterSize: 4
+    name: "Giant Squid"
+    tile: 134
+    basehp: 96
+    exp: 7
+    ranged: true
+    ranged_hit_tile: energy_field
+    ranged_miss_tile: energy_field
+    poisons: true
+    swims: true
+    leader: 21
+  21:
+    encounterSize: 4
+    name: "Sea Serpent"
+    tile: 136
+    basehp: 128
+    exp: 9
+    ranged: true
+    world_ranged_tile: hit_flash
+    ranged_hit_tile: hit_flash
+    ranged_miss_tile: hit_flash
+    swims: true
+    leader: 20
+  22:
+    encounterSize: 8
+    name: "Seahorse"
+    tile: 138
+    basehp: 128
+    exp: 9
+    movement: wanders
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    swims: true
+    good: true
+    leader: 19
+  23:
+    encounterSize: 1
+    name: "Whirlpool"
+    forceOfNature: true
+    tile: 140
+    basehp: 255
+    exp: 16
+    swims: true
+    movement: wanders
+    cantattack: true
+    canMoveOntoCreatures: true
+    canMoveOntoAvatar: true
+    wontattack: true
+  24:
+    encounterSize: 1
+    name: "Twister"
+    forceOfNature: true
+    tile: 142
+    basehp: 255
+    exp: 16
+    flies: true
+    movement: wanders
+    cantattack: true
+    canMoveOntoCreatures: true
+    canMoveOntoAvatar: true
+    wontattack: true
+  25:
+    encounterSize: 12
+    name: "Rat"
+    tile: 144
+    basehp: 48
+    exp: 4
+    movement: wanders
+    good: true
+    leader: 38
+  26:
+    encounterSize: 12
+    name: "Bat"
+    tile: 148
+    basehp: 48
+    exp: 4
+    flies: true
+    movement: wanders
+    good: true
+    leader: 47
+    nochest: true
+  27:
+    encounterSize: 6
+    name: "Giant Spider"
+    tile: 152
+    basehp: 64
+    exp: 5
+    ranged: true
+    ranged_hit_tile: poison_field
+    ranged_miss_tile: poison_field
+    spawntile: swamp
+    movement: wanders
+    good: true
+    poisons: true
+    leader: 25
+  28:
+    encounterSize: 4
+    name: "Ghost"
+    tile: 156
+    basehp: 80
+    exp: 6
+    undead: true
+    resists: sleep
+    incorporeal: true
+    leader: 46
+  29:
+    encounterSize: 15
+    name: "Slime"
+    tile: 160
+    ambushes: true
+    basehp: 48
+    exp: 4
+    divides: true
+    nochest: true
+  30:
+    encounterSize: 6
+    name: "Troll"
+    tile: 164
+    ambushes: true
+    basehp: 96
+    exp: 7
+    ranged: true
+    leader: 41
+  31:
+    encounterSize: 15
+    name: "Gremlin"
+    tile: 168
+    basehp: 48
+    exp: 4
+    steals: food
+  32:
+    encounterSize: 1
+    name: "Mimic"
+    tile: 172
+    basehp: 192
+    exp: 13
+    ranged: true
+    ranged_hit_tile: poison_field
+    ranged_miss_tile: poison_field
+    movement: none
+    camouflage: true
+    camouflageTile: chest
+  33:
+    encounterSize: 1
+    name: "Reaper"
+    tile: 176
+    basehp: 255
+    exp: 16
+    ranged: true
+    ranged_hit_tile: random
+    ranged_miss_tile: random
+    movement: none
+    casts: sleep
+  34:
+    encounterSize: 15
+    name: "Insect Swarm"
+    tile: 180
+    ambushes: true
+    basehp: 48
+    exp: 4
+    good: true
+    movement: wanders
+    leader: 25
+    nochest: true
+  35:
+    encounterSize: 4
+    name: "Gazer"
+    tile: 184
+    basehp: 240
+    exp: 16
+    ranged: true
+    ranged_hit_tile: sleep_field
+    ranged_miss_tile: sleep_field
+    leader: 36
+    spawnsOnDeath: 34
+  36:
+    encounterSize: 8
+    name: "Phantom"
+    tile: 188
+    basehp: 128
+    exp: 9
+    undead: true
+    resists: sleep
+    leader: 28
+  37:
+    encounterSize: 10
+    name: "Orc"
+    tile: 192
+    ambushes: true
+    basehp: 80
+    exp: 6
+    leader: 30
+  38:
+    encounterSize: 12
+    name: "Skeleton"
+    tile: 196
+    ambushes: true
+    basehp: 48
+    exp: 4
+    undead: true
+    resists: sleep
+    leader: 45
+  39:
+    encounterSize: 10
+    name: "Rogue"
+    tile: 200
+    ambushes: true
+    basehp: 80
+    exp: 6
+    steals: gold
+  40:
+    encounterSize: 12
+    name: "Python"
+    tile: 204
+    basehp: 48
+    ambushes: true
+    exp: 4
+    ranged: true
+    ranged_hit_tile: poison_field
+    ranged_miss_tile: poison_field
+    poisons: true
+    good: true
+    movement: wanders
+    leader: 25
+  41:
+    encounterSize: 6
+    name: "Ettin"
+    tile: 208
+    basehp: 112
+    exp: 8
+    ranged: true
+    ranged_hit_tile: rocks
+    ranged_miss_tile: rocks
+    leader: 49
+  42:
+    encounterSize: 8
+    name: "Headless"
+    tile: 212
+    basehp: 64
+    exp: 5
+    leader: 35
+  43:
+    encounterSize: 6
+    name: "Cyclops"
+    tile: 216
+    basehp: 128
+    exp: 9
+    ranged: true
+    ranged_hit_tile: rocks
+    ranged_miss_tile: rocks
+    leader: 48
+  44:
+    encounterSize: 12
+    name: "Wisp"
+    tile: 220
+    ambushes: true
+    basehp: 64
+    exp: 5
+    teleports: true
+    leader: 36
+    nochest: true
+  45:
+    encounterSize: 6
+    name: "Evil Mage"
+    tile: 224
+    basehp: 176
+    exp: 12
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    leader: 49
+  46:
+    encounterSize: 4
+    name: "Liche"
+    tile: 228
+    basehp: 192
+    exp: 13
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    undead: true
+    resists: sleep
+    leader: 49
+  47:
+    encounterSize: 8
+    name: "Lava Lizard"
+    tile: 232   
+    basehp: 96
+    exp: 7
+    ranged: true
+    world_ranged_tile: hit_flash
+    ranged_hit_tile: lava
+    ranged_miss_tile: lava
+    resists: fire
+    leader: 50
+    leavestile: true
+  48:
+    encounterSize: 4
+    name: "Zorn"
+    tile: 236
+    basehp: 240
+    exp: 16
+    casts: negate
+    incorporeal: true
+    leader: 35
+  49:
+    encounterSize: 6
+    name: "Daemon"
+    tile: 240
+    basehp: 112
+    exp: 8
+    ranged: true
+    ranged_hit_tile: magic_flash
+    ranged_miss_tile: magic_flash
+    flies: true
+    resists: fire
+    leader: 52
+  50:
+    encounterSize: 4
+    name: "Hydra"
+    tile: 244
+    basehp: 208
+    exp: 14
+    ranged: true
+    world_ranged_tile: hit_flash
+  51:
+    encounterSize: 4
+    name: "Dragon"
+    tile: 248
+    basehp: 224
+    exp: 15
+    ranged: true
+    world_ranged_tile: hit_flash
+    ranged_hit_tile: hit_flash
+    ranged_miss_tile: hit_flash
+    flies: true
+    resists: fire
+    leader: 52
+  52:
+    encounterSize: 1
+    name: "Balron"
+    tile: 252
+    basehp: 255
+    exp: 16
+    ranged: true
+    rangedhittile: random
+    rangedmisstile: random
+    flies: true
+    casts: sleep
+    resists: fire
+  53:
+    name: "Phantom"
+    tile: 188
+    basehp: 48
+    exp: 14
+    good: true
+  54:
+    name: "Phantom"
+    tile: 188
+    basehp: 48
+    exp: 4
+    good: true
+    comment: ?? tile and comment was 'campfire' ??
+  55:
+    name: "Villager"
+    tile: 56
+    basehp: 32
+    exp: 13
+    good: true
+    comment: Wounded Villager
+  56:
+    name: "Adventurer"
+    tile: 31
+    basehp: 160
+    exp: 11
+    good: true
+    comment: Avatar tile
+  57:
+    name: "Water"
+    tile: 2
+    basehp: 255
+    exp: 16
+    good: true
+    swims: true
+    comment: Water in LBs castle
+  58:
+    name: "Ankh"
+    tile: 61
+    basehp: 255
+    exp: 16
+    good: true
+    comment: Ankh in Skara Brae
+  59:
+    name: "Phantom"
+    tile: fire_phantom
+    basehp: 48
+    exp: 14
+    resists: fire
+    canMoveOntoAvatar: true
+    rangedhittile: random
+    rangedmisstile: fire_field
+    leader: 45
+    divides: true
+    u4SaveId: 70
+    comment: Peculiar Fire field phantoms found in Destard LV4
+
