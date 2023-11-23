@@ -7,7 +7,7 @@ HERE = os.path.dirname(__file__)
 
 setuptools.setup(
     name='qwack',
-    version='0.0.4',
+    version='0.0.5',
     install_requires=['pyyaml', 'blessed'],
     long_description=open(os.path.join(HERE, 'README.rst')).read(),
     description='a rogue-like game of mysterious origins!',

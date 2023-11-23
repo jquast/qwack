@@ -8,9 +8,6 @@ import os
 import io
 import timeit
 
-# 3rd party
-import PIL.Image
-
 # import colorsys
 
 MAX_DARKNESS_LEVEL = 4
@@ -82,7 +79,11 @@ def get_ansi_txt_tile(
         # inverse.
         return ["\x1b[0m" + (" " * tile_width)] * tile_height
     return shape_data[tile_id][darkness]["value"]
+
+
 def apply_offsets(x_offset, y_offset, ref_image):
+    import PIL.Image
+
     tmp_img = PIL.Image.new(ref_image.mode, ref_image.size)
 
     # Loop through each pixel and shift themn by given offset
@@ -198,6 +199,7 @@ def make_png_bytes(width, height, pixels):
 
 
 def make_image_from_pixels(pixels):
+    import PIL.Image
     height = width = (
         16 if len(pixels) == (16 * 16) else 32 if len(pixels) == (32 * 32) else -1
     )
