@@ -16,7 +16,7 @@ setuptools.setup(
     license='MIT',
     packages=['qwack'],
     # just add the tilesets and world.yaml so far ..
-    package_data={"dat": ["*.zip", "*.yaml"]},
+    package_data={"dat": ["*.zip", "*.yaml", "*.ULT", "*.MAP"]},
     url='https://github.com/jquast/qwack',
     include_package_data=True,
     zip_safe=True,

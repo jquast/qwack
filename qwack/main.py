@@ -1203,8 +1203,6 @@ if __name__ == "__main__":
 #
 # Today,
 #
-# - make the code run again !
-#
 # - pre-render all ansi! persist to disk! removes chafa library need at runtime !!
 #   - it would have to be all tiles
 #     - at all resolutions
@@ -1217,9 +1215,6 @@ if __name__ == "__main__":
 #     - results as array of ansi strings
 #
 #   (!)
-#
-# - make world enter @ start_x, start_y work
-# - make world exit out-of-bounds ("step into void") work
 #
 # fix directionals, allow *both* ??
 # - hjkl + yubn (already done)
