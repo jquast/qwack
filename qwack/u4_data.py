@@ -256,8 +256,12 @@ def create_npcs(map_id: int, world_data: dict) -> list[models.Item]:
     npc_definitions = load_npcs_from_u4_ult_map(map_id, world_data)
     for npc_definition in npc_definitions:
         npc_id = npc_definition.pop("npc_id")
-        npc_definition["name"] = npc_talk_data[npc_id - 1]["name"]
-        npc_definition["talk_data"] = npc_talk_data[npc_id - 1]
+        try:
+            npc_definition["name"] = npc_talk_data[npc_id - 1]["name"]
+            npc_definition["talk_data"] = npc_talk_data[npc_id - 1]
+        except IndexError:
+            npc_definition["name"] = "IDX.ERR#" + str(npc_id)
+            npc_definition["talk_data"] = None
         items.append(models.Item(**npc_definition))
     # load NPCs from world_data
     for npc_definition in world_data["Maps"][map_id].get("npcs", []):
