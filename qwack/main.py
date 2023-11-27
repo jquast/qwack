@@ -38,13 +38,11 @@ def make_direction(y=0, x=0):
 
 # This was "font ratio", 3/2, but with tiles that have already been converted
 # to their correct aspect ratio by CHAFA, '1' provides the best "circle" effect
-DEFAULT_RADIUS = 6
-DEFAULT_DARKNESS = 1
 VIS_RATIO = 1
 TIME_ANIMATION_TICK = 0.20
 TIME_PLAYER_PASS = 23
 TEXT_HISTORY_LENGTH = 1000
-MAX_RADIUS = 9
+MAX_RADIUS = 15
 MIN_RADIUS = 2
 LORD_BRITISH_CASTLE_ID = 14
 
@@ -495,9 +493,9 @@ class UInterface(object):#
     waiting_open_direction = 0
     waiting_talk_direction = 0
 
-    def __init__(self, tile_svc, darkness=2, radius=DEFAULT_RADIUS):
+    def __init__(self, tile_svc, darkness=2, radius=9):
         self.term = blessed.Terminal()
-        self.dirty = True
+        self.dirty = 0
         self.radius = radius
         self.darkness = darkness
         self.tile_svc = tile_svc
@@ -509,6 +507,7 @@ class UInterface(object):#
         # redrawn, which is less output I/O especially while idle, changing
         # time of render() from ~20ms to as little as 1ms.
         self.tile_output_buffer = {}
+        self.text_output_buffer = {}
 
     @property
     def window_size(self):
@@ -518,7 +517,7 @@ class UInterface(object):#
         return self.term.inkey(timeout=timeout)
 
     def reactor(self, inp, ui, world, viewport):
-        self.dirty = True
+        self.dirty = 1
         if ui.talk_npc:
             if inp:
                 world.do_talk_npc(ui, viewport, inp)
@@ -610,23 +609,33 @@ class UInterface(object):#
                 self.auto_resize(viewport)
                 self.tile_svc.tile_data = self.tile_svc.init_tiles(self.tile_svc.tile_filename, self.tile_svc.tile_size)
             elif inp == "R":
-                self.radius = DEFAULT_RADIUS if not self.radius else 0
+                self.radius = 9 if not self.radius else 0
             elif inp in ("[", "]"):  # ^D
                 modifier = 1 if inp == "]" else -1
-                self.darkness = max(min(self.darkness + modifier, u4_tiler.MAX_DARKNESS), u4_tiler.MIN_DARKNESS - self.radius + 3)
+                self.darkness = max(min(self.darkness + modifier, u4_tiler.MAX_DARKNESS), -60)
                 viewport.add_text(f"* set darkness level {self.darkness}")
             elif inp == "\x12":  # ^R
                 self.tile_svc.cycle_tileset()
-            elif inp in ("(",")") and self.radius is not None:
+                viewport.dirty = 2
+            elif inp == "\x14":  # ^T
+                self.tile_svc.cycle_charset()
+                viewport.dirty = 2
+            elif inp in ("(", ")") and self.radius is not None:
                 modifier = 1 if inp == ")" else -1
                 self.radius = max(min(self.radius + modifier, MAX_RADIUS), MIN_RADIUS)
                 viewport.add_text(f"* set radius to {self.radius}")
-            elif inp in ("}", "{"):
+            elif inp in ("{", "}"):
                 modifier = 1 if inp == "}" else -1
                 tile_idx = min(max(0, u4_tiler.TILE_SIZES.index(self.tile_svc.tile_size) + modifier), len(u4_tiler.TILE_SIZES) - 1)
                 next_size = u4_tiler.TILE_SIZES[tile_idx]
                 self.tile_svc.tile_data = self.tile_svc.init_tiles(self.tile_svc.tile_filename, next_size)
                 viewport.add_text(f"* set tile size to {self.tile_svc.tile_size}")
+            elif inp in ("<", ">"):
+                modifier = 1 if inp == ">" else -1
+                char_idx = min(max(0, u4_tiler.CHAR_SIZES.index(self.tile_svc.char_size) + modifier), len(u4_tiler.CHAR_SIZES) - 1)
+                next_size = u4_tiler.CHAR_SIZES[char_idx]
+                self.tile_svc.char_data = self.tile_svc.init_chars(self.tile_svc.char_filename, next_size)
+                viewport.add_text(f"* set char size to {self.tile_svc.char_size}")
             elif inp == 'L':
                 assert False, LOG
             elif inp == '*':
@@ -638,7 +647,7 @@ class UInterface(object):#
                 world.player.last_action_tick = world.time
             else:
                 # return early
-                self.dirty = False
+                self.dirty = 0
                 return world
         if self.dirty:
             # Ultima IV is cruel, if *anything* happens it drives
@@ -679,7 +688,6 @@ class UInterface(object):#
     @contextlib.contextmanager
     def activate(self):
         with self.term.fullscreen(), self.term.keypad(), self.term.cbreak(), self.term.hidden_cursor():
-            echo(self.term.clear)
             yield self
 
     def debug_details(self):
@@ -695,50 +703,52 @@ class UInterface(object):#
         }
 
 
-    def make_plot_char_yx(self, y, x, char):
-        result = ''
-        char_tile = self.tile_svc.make_character_tile(char)
-        for y_offset, line in enumerate(char_tile):
-            result += (self.term.move(y + y_offset, x) + line)
-        return result
-
-    def render_text(self, viewport, debug_details):
-        ypos = viewport.yoffset
+    def _render_debug_details(self, viewport, debug_details):
+        ypos, xpos = viewport.yoffset, (viewport.xoffset * 2) + viewport.width
         left = viewport.width + (viewport.xoffset * 2)
-        width = max(0, self.term.width - left - (viewport.xoffset)) // self.tile_svc.char_width
-        if width == 0:
-            return
-        height = max(0, viewport.height - ypos) // self.tile_svc.char_height
-
-        # for debug_item in debug_details.items():
-        #     debug_text_lines = textwrap.wrap(
-        #         f"{debug_item[0]}: {debug_item[1]}", width=width, subsequent_indent=" ",
-        #         drop_whitespace=False,
-        #     )
-        #     for text_line in debug_text_lines or ['']:
-        #         ypos += 1
-        #         echo(self.term.move_yx(ypos, left))
-        #         echo(self.term.ljust(text_line, width))
-
-        all_text = []
-        for text_message in list(viewport.text)[-height:]:
-            all_text.extend(
-                textwrap.wrap(text_message, width=width, subsequent_indent='') or ['']
-            )
-        self._render_displayed_text(text_lines=all_text[-height:], ypos=ypos, left=left, height=height, width=width)
-
-    def _render_displayed_text(self, text_lines, ypos, left, height, width):
-        # TODO: double buffer it!
+        width = max(0, self.term.width - left - (viewport.xoffset))
         output = ''
-        y = 0
+        for debug_key, debug_val  in debug_details.items():
+            for line in textwrap.wrap(
+                f"{debug_key}: {debug_val}",
+                width=viewport.width, subsequent_indent=" ", drop_whitespace=False
+            ):
+                output += self.term.move_yx(ypos, xpos) + line.ljust(width)
+                ypos += 1
+        echo(output)
+        
+
+    def render_text(self, viewport):
+        if viewport.dirty:
+            ypos = viewport.yoffset
+            left = viewport.width + (viewport.xoffset * 2)
+            width = max(0, self.term.width - left - (viewport.xoffset)) // self.tile_svc.char_width
+            if width == 0:
+                return
+            height = max(0, viewport.height - ypos) // self.tile_svc.char_height
+            all_text = []
+            for text_message in list(viewport.text)[-height:]:
+                all_text.extend(
+                    textwrap.wrap(text_message, width=width, subsequent_indent='') or ['']
+                )
+            echo(self.make_displayed_text(text_lines=all_text[-height:], ypos=ypos, left=left,
+                                          height=height, width=width, dirty=viewport.dirty))
+        viewport.dirty = 0
+
+    def make_displayed_text(self, text_lines, ypos, left, height, width, dirty):
+        output = ''
         while len(text_lines) < height:
-            text_lines.append('')
+            text_lines.append(' - fill! -')
         for y, text_line in enumerate(text_lines):
             actual_y = ypos + (y * self.tile_svc.char_height)
             for x, text_char in enumerate(text_line.ljust(width)):
                 actual_x = left + (x * self.tile_svc.char_width)
-                output += self.make_plot_char_yx(actual_y, actual_x, text_char)
-        echo(output, flush=True)
+                char_tile = self.tile_svc.make_character_tile(character=text_char)
+                if dirty > 1 or char_tile != self.text_output_buffer.get((y, x)):
+                    self.text_output_buffer[(y, x)] = char_tile
+                    for y_offset, char_tile_row in enumerate(char_tile):
+                        output += self.term.move(actual_y + y_offset, actual_x) + char_tile_row
+        return output
 
     def maybe_draw_viewport(self, viewport, force=False):
         # todo: make exactly like IV, with moon phases, etc!
@@ -763,14 +773,14 @@ class UInterface(object):#
                     )
                 )
                 echo(border_color(" " * viewport.xoffset))
-            echo(border_color(" " * self.term.width) * viewport.yoffset, flush=True)
+            echo(border_color(" " * self.term.width) * viewport.yoffset)
         viewport.dirty = 0
 
     def render(self, world, viewport):
         viewport.re_adjust(ui=self, player_pos=world.player_pos)
-        if viewport.dirty:
-            # self.auto_resize(viewport)
-            self.dirty = True
+        if viewport.dirty > 1:
+            # if player resizes screen, re-adjust for optimal tile sizes
+            self.auto_resize(viewport)
         self.maybe_draw_viewport(viewport)
         if self.dirty:
             # Does this belong in TileService ?
@@ -788,8 +798,8 @@ class UInterface(object):#
                             actual_ypos = ypos + ans_y + viewport.yoffset
                             if actual_ypos <= viewport.height:
                                 output_text += (self.term.move_yx(actual_ypos, actual_xpos) + ans_txt)
-            echo(output_text, flush=True)
-            self.dirty = False
+            echo(output_text)
+            self.dirty = 0
 
 class Viewport:
     """
@@ -809,7 +819,7 @@ class Viewport:
         (self.y, self.x) = (y, x)
         self.height, self.width = height, width
         self.yoffset, self.xoffset = yoffset, xoffset
-        self.dirty = True
+        self.dirty = 0
         self.text = collections.deque(maxlen=TEXT_HISTORY_LENGTH)
 
     def __repr__(self):
@@ -817,7 +827,7 @@ class Viewport:
 
     def add_text(self, text):
         self.text.append(text)
-        self.dirty = True
+        self.dirty = 1
 
     def add_text_append(self, text):
         # add text to the last line for continuation of paragraph,
@@ -830,7 +840,7 @@ class Viewport:
             val = val[:-1]
             text = ''
         self.text.append(val + text)
-        self.dirty = True
+        self.dirty = 1
 
     @classmethod
     def create(cls, yoffset=1, xoffset=2):
@@ -840,9 +850,12 @@ class Viewport:
 
     def re_adjust(self, ui, player_pos):
         "re-center viewport on player and set 'dirty' flag on terminal resize"
+        viewport_char_width = 15
+        viewport_pct_width = 0.80
         height = ui.term.height - (self.yoffset * 2)
-        width = min(ui.term.width - 20, int(ui.term.width * 0.8))
-        self.dirty = (height, width) != (self.height, self.width)
+        width = min(ui.term.width - (viewport_char_width * ui.tile_svc.char_width), int(ui.term.width * viewport_pct_width))
+        # sets viewport.dirty to '2' when terminal resize is detected
+        self.dirty = 2 if (height, width) != (self.height, self.width) else 0
         self.height, self.width = height, width
         self.y, self.x = 0, 0
 
@@ -966,62 +979,46 @@ class Viewport:
 
 def _loop(ui, world, viewport):
     inp = None
-    (
-        time_render,
-        time_action,
-        time_input,
-        time_stats,
-    ) = (
-        0,
-        0,
-        0,
-        0,
-    )
-
-    time_render = time_action = time_input = time_stats = 0
-
+    time_render = 0
+    time_action = 0
+    time_input = 0
+    time_stats = 0
     time_render = 0
     # cause very first key input to have a timeout of nearly 0
-    first_tick = 0.0001
     while True:
-        with elapsed_timer() as _time_stats:
-            ui.render_text(
-                viewport,
-                debug_details={
-                    "ms-render-world": int(time_render * 1e3),
-                    "ms-action": int(time_action * 1e3),
-                    "ms-input": int(time_input * 1e3),
-                    "ms-stats": int(time_stats * 1e3),
-                    # of "whole world"
-                    **world.debug_details(pos=world.player_pos),
-                    # details of "small world"
-                    **ui.debug_details(),
-                } if world.wizard_mode else {},
-            )
-        time_stats = _time_stats()
+        with elapsed_timer() as time_text:
+            ui.render_text(viewport)
+        time_text = time_text()
 
         with elapsed_timer() as time_render:
             ui.render(world, viewport)
-        time_render = time_render()
+            # if world.wizard_mode:
+            #     ui._render_debug_details(viewport, debug_details={
+            #         "ms-world-render": int(time_render() * 1e3),
+            #         "ms-reactor": int(time_action * 1e3),
+            #         "ms-input": int(time_input * 1e3),
+            #         "ms-text": int(time_text * 1e3),
+            #         # of "whole world"
+            #         **world.debug_details(pos=world.player_pos),
+            #         # details of "small world"
+            #         **ui.debug_details(),
+            #     })
+            echo('', flush=True)
 
-        if first_tick:
-            # skip waiting for input after first tick
-            first_tick = 0
-        else:
-            with elapsed_timer() as time_input:
-                inp = ui.reader(timeout=max(0, TIME_ANIMATION_TICK))
-                # throw away remaining input, small hack for
-                # games where folks bang on the keys to run
-                # (or boat!) as fast as they can, take "out"
-                # all keys, then push back in the last-most
-                # key.
-                if inp:
-                    save_key = None
-                    while inp2 := ui.term.inkey(timeout=0):
-                        save_key = inp2
-                    if save_key and save_key != inp:
-                        ui.term.ungetch(save_key)
-            time_input = time_input()
+        with elapsed_timer() as time_input:
+            inp = ui.reader(timeout=max(0, TIME_ANIMATION_TICK))
+            # throw away remaining input, small hack for
+            # games where folks bang on the keys to run
+            # (or boat!) as fast as they can, take "out"
+            # all keys, then push back in the last-most
+            # key.
+            if inp:
+                save_key = None
+                while inp2 := ui.term.inkey(timeout=0):
+                    save_key = inp2
+                if save_key and save_key != inp:
+                    ui.term.ungetch(save_key)
+        time_input = time_input()
 
         with elapsed_timer() as time_action:
             world = ui.reactor(inp, ui, world, viewport)
@@ -1056,12 +1053,14 @@ def main():
         char_filename=world_data['DEFAULT_CHARSET'],
         char_size=world_data['DEFAULT_CHAR_SIZE'],
         )
-    ui = UInterface(tile_svc=tile_svc, darkness=DEFAULT_DARKNESS, radius=DEFAULT_RADIUS)
+    ui = UInterface(tile_svc=tile_svc,
+                    darkness=world_data.get('DEFAULT_DARKNESS', 1),
+                    radius=world_data.get('DEFAULT_RADIUS', 9))
     world = init_begin_world(world_data)
     viewport = Viewport.create()
     for n in range(128):
         viewport.add_text_append(chr(n))
-    ui.maybe_draw_viewport(viewport)
+    ui.maybe_draw_viewport(viewport, force=True)
     with ui.activate():
         _loop(ui, world, viewport)
 

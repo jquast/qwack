@@ -14,7 +14,6 @@ Tilesets:
     - {"mode": "ega", "filename": "SHAPES.EGA", "description": "Original PC-DOS EGA set"}
     - {"mode": "vga", "filename": "jsteele-shapes.vga", "description": "VGA by github.com/jahshuwaa"}
     - {"mode": "ega", "filename": "jsteele-shapes.ega", "description": "EGA by github.com/jahshuwaa"}
-
 DEFAULT_TILESET: jsteele-shapes.ega
 DEFAULT_TILE_SIZE: 16
 
@@ -23,8 +22,11 @@ Charsets:
     - {"mode": "ega", "filename": "jsteele-charset.ega", description": "EGA by github.com/jahshuwaa"}
     - {"mode": "ega", "filename": "CHARSET.EGA", description": "Original PC-DOS EGA set"}
     - {"mode": "vga", "filename": "CHARSET.VGA", description": "VGA by github.com/jahshuwaa"}
-DEFAULT_CHARSET: CHARSET.EGA
+DEFAULT_CHARSET: CHARSET.VGA
 DEFAULT_CHAR_SIZE: 8
+
+DEFAULT_RADIUS: 9
+DEFAULT_DARKNESS: -1
 
 
 Shapes:
@@ -246,23 +248,27 @@ Shapes:
        material: liquid 
        sort_value: 3
        brightness: 1
+       land_passable: yes
     69:
        name: Energy Field
        material: fire
        sort_value: 3
        brightness: 1
+       land_passable: yes
     70:
        name: Fire Field
        material: fire
        speed: 2
        sort_value: 3
        brightness: 1
+       land_passable: yes
     71:
        name: Sleep Field
        material: fire
        speed: 2
        sort_value: 3
        brightness: 1
+       land_passable: yes
     72:
        name: Solid Barrier
        land_passable: no
@@ -467,9 +473,52 @@ Shapes:
         name: Brick Wall
         land_passable: no
         darkness: 1
-    
-
-
+    128:
+        name: Pirate Ship West
+        land_passable: yes
+    129:
+        name: Pirate Ship North
+        land_passable: yes
+    130:
+        name: Pirate Ship East
+        land_passable: yes
+    131:
+        name: Pirate Ship South
+        land_passable: yes
+    132:
+        name: Nixie 1
+        material: flesh
+        land_passable: no
+    133:
+        name: Nixie 2
+        material: flesh
+        land_passable: no
+    134:
+        name: Giant Squid 1
+        material: flesh
+        land_passable: no
+    135:
+        name: Giant Squid 2
+        material: flesh
+        land_passable: no
+    136:
+        name: Sea Serpent 1
+        material: flesh
+        land_passable: no
+    137:
+        name: Sea Serpent 2
+        material: flesh
+        land_passable: no
+    138:
+        name: Seahorse 1
+        material: flesh
+        land_passable: no
+        composite: no
+    139:
+        name: Seahorse 2
+        material: flesh
+        land_passable: no
+        composite: no
     176:
         name: Reaper 1
         material: flesh
@@ -488,12 +537,54 @@ Shapes:
         land_passable: no
 
 
+    188:
+        name: Phantom 1
+        material: flesh
+        land_passable: no
     189:
         name: Phantom 2
-        brightness: 1
-
-
-
+        material: flesh
+        land_passable: no
+    190:
+        name: Phantom 3
+        material: flesh
+        land_passable: no
+    191:
+        name: Phantom 4 
+        material: flesh
+        land_passable: no
+    196:
+        name: Skeleton 1
+        material: flesh
+        land_passable: no
+    197:
+        name: Skeleton 2
+        material: flesh
+        land_passable: no
+    198:
+        name: Skeleton 3
+        material: flesh
+        land_passable: no
+    199:
+        name: Skeleton 4 
+        material: flesh
+        land_passable: no
+    200:
+        name: Rogue 1
+        material: flesh
+        land_passable: no
+    201:
+        name: Rogue 2
+        material: flesh
+        land_passable: no
+    202:
+        name: Rogue 3
+        material: flesh
+        land_passable: no
+    203:
+        name: Rogue 4 
+        material: flesh
+        land_passable: no
     224:
         name: Evil Mage 1
         land_passable: no

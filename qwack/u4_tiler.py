@@ -21,7 +21,7 @@ MAX_DARKNESS = 5
 TILE_SIZES = (1, 2, 3, 6, 8, 12, 16)
 MIN_TILE_SIZE = min(TILE_SIZES)
 MAX_TILE_SIZE = max(TILE_SIZES)
-CHAR_SIZES = (4, 6, 8, 10, 12, 14, 16)
+CHAR_SIZES = (6, 7, 8)
 MIN_CHAR_SIZE = min(CHAR_SIZES)
 MAX_CHAR_SIZE = max(CHAR_SIZES)
 EGA2RGB = [
@@ -50,9 +50,7 @@ CHAFA_BIN = os.path.join(
     os.path.dirname(__file__), os.pardir, os.pardir, "chafa", "tools", "chafa", "chafa"
 )
 CHAFA_TRIM_START = len("\x1b[?25l\x1b[0m")
-# very strange, higher optimization levels (-O 3 or greater) add aliasing, which causes blurring
-# which ends up with images 50% darker, so -O 1 is used !
-CHAFA_EXTRA_ARGS = ["-w", "9", "-O", "1"]
+CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1", "--font-ratio=9/16"]
 
 TILESET_CACHE_ZIP = os.path.join(os.path.dirname(__file__), "tileset_cache.zip")
 TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a')
@@ -158,7 +156,7 @@ class TileService:
                 self._make_ansi_tile.cache_clear()
                 tile_ff_ansi_txt = self.make_ansi_text_from_image(
                     ref_image=make_image_from_pixels(pixels=tile_data[0xFF]),
-                    tile_width=tile_size, tile_height=max(1, tile_size - 1))
+                    tile_width=tile_size, tile_height=max(1, tile_size))
                 self.tile_size = tile_size
                 self.tile_width = tile_size
                 self.tile_height = len(tile_ff_ansi_txt)
@@ -219,16 +217,14 @@ class TileService:
     def make_character_tile(self, character: str, darkness=0, x_offset=0, y_offset=0, inverse=False):
         return self._make_ansi_tile(tile_id=ord(character),
                                     bg_tile_id=None,
-                                    tile_filename=self.tile_filename,
-                                    # CHECK !
-                                    tile_width=self.tile_width // 2,
-                                    tile_height=self.tile_height // 2,
+                                    tile_filename=self.char_filename,
+                                    tile_width=self.char_width,
+                                    tile_height=self.char_height,
                                     tile_darkness=darkness,
-                                    x_offset_bg=0,
-                                    y_offset_bg=0,
                                     x_offset_fg=x_offset,
                                     y_offset_fg=y_offset,
-                                    inverse=inverse)
+                                    inverse=inverse,
+                                    data_source='char')
 
     def make_ansi_tile(self, items, player_pos, darkness):
         # TODO: move all this logic into an ItemCollection.render_ansi()
@@ -270,21 +266,23 @@ class TileService:
 
 
     @functools.lru_cache(maxsize=256)
-    def get_pixel_cache(self, tile_filename, tile_id):
+    def get_pixel_cache(self, tile_filename, tile_id, data_source):
+        assert data_source in ('tile', 'char')
         if tile_id is not None:
-            return make_image_from_pixels(pixels=self.tile_data[tile_id])
+            pixel_storage = self.tile_data if data_source == 'tile' else self.char_data
+            return make_image_from_pixels(pixels=pixel_storage[tile_id])
 
     @functools.lru_cache(maxsize=1024)
     def _make_ansi_tile(self, tile_id, bg_tile_id, tile_filename, tile_width, tile_height,
                               tile_darkness=0, x_offset_bg=0, y_offset_bg=0,
-                              x_offset_fg=0, y_offset_fg=0, inverse=False):
+                              x_offset_fg=0, y_offset_fg=0, inverse=False, data_source='tile'):
         val = self.load_disk_cache(tile_id, bg_tile_id, tile_filename, tile_width, tile_height,
                                        tile_darkness, x_offset_bg, y_offset_bg,
                                        x_offset_fg, y_offset_fg, inverse)
         if val is not None:
             return val
-        fg_image = self.get_pixel_cache(tile_filename, tile_id)
-        bg_image = self.get_pixel_cache(tile_filename, bg_tile_id)
+        fg_image = self.get_pixel_cache(tile_filename, tile_id, data_source)
+        bg_image = self.get_pixel_cache(tile_filename, bg_tile_id, data_source)
         # apply darkness to both layers
         bg_image = apply_darkness(bg_image, tile_darkness)
         fg_image = apply_darkness(fg_image, tile_darkness)
