@@ -44,6 +44,8 @@ TEXT_HISTORY_LENGTH = 1000
 MAX_RADIUS = 15
 MIN_RADIUS = 2
 LORD_BRITISH_CASTLE_ID = 14
+TIME_CONFUSION_TICKS = 100
+SPELL_CAST_TICKS = 4
 
 # probably better in the YAML, but gosh, lots of junk in "World" ?
 SHIP_TILE_DIRECTIONS = {16: "West", 17: "North", 18: "East", 19: "South"}
@@ -363,10 +365,13 @@ class World(dict):
             return
         # player "becomes a boat"
         self.player.tile_id = boat.tile_id
+
         # delete what was "boarded"
         self[(self.player.pos.y, self.player.pos.x)].remove(boat)
+        
         if not self.get(self.player.pos.y, self.player.pos.x):
-            rock = models.Item.create_horse(self.player.pos)
+            # when "unboarding" on a void tile, place a rock .., maybe not necessary
+            rock = models.Item.create_rock(self.player.pos)
             self[(self.player.pos.y, self.player.pos.x)].append(rock)
 
     def exit_ship_or_unmount_horse(self, ui):
@@ -451,10 +456,24 @@ class World(dict):
             is_void = False
         return is_void
 
-    def tick(self):
+    def tick(self, ui):
         # Ultima IV was cruel, it always advanced the time, even without input
         # or making an invalid action, etc
         self.world_time += self.tick_amount
+        if (ui.cast_spell_state == models.SpellState.BEGIN_SPELL and
+                self.world_time >= ui.cast_spell_time + SPELL_CAST_TICKS):
+            ui.cast_spell_state = models.SpellState.CAST_SPELL
+            ui.cast_spell_time = 0
+        if ui.cast_spell_state == models.SpellState.CAST_SPELL:
+            # begin Confusion spell, this is just a fun (nethack-inspired) effect
+            if ui.cast_spell_kind == "C":
+                ui.confusion = self.world_time
+            ui.cast_spell_state = models.SpellState.NONE
+        elif ui.confusion and self.world_time >= ui.confusion + TIME_CONFUSION_TICKS:
+            #assert False, (ui.confusion, self.world_time, '>=', ui.confusion + TIME_CONFUSION_TICKS)
+            # end confusion spell
+            ui.confusion = 0
+            ui.add_text("You feel better")
         # XXX performance penalty, needs better tracking "self.Doors?"
         #self.check_close_opened_doors()
 
@@ -489,6 +508,9 @@ class UInterface(object):#
     waiting_open_direction = 0
     waiting_talk_direction = 0
     show_debug = False
+    cast_spell_state = models.SpellState.NONE
+    cast_spell_kind = None
+    confusion = 0
 
     def __init__(self, tile_svc, darkness=2, radius=9):
         self.term = blessed.Terminal()
@@ -520,9 +542,24 @@ class UInterface(object):#
         return self.term.inkey(timeout=timeout)
 
     def reactor(self, inp, ui, world, viewport):
-        if ui.talk_npc:
+        if ui.cast_spell_state == models.SpellState.BEGIN_SPELL and inp:
+            # no input allowed during spell casting, re-queue input for next
+            # tick, and continue to allow us to fall-through to world.tick()
+            ui.term.ungetch(inp)
+            inp = None
+        elif ui.talk_npc:
             if inp:
                 world.do_talk_npc(ui, viewport, inp)
+        elif inp and ui.cast_spell_state == models.SpellState.WAIT_FOR_SPELL:
+            ui.cast_spell_state = models.SpellState.BEGIN_SPELL
+            ui.cast_spell_kind = inp.upper()
+            ui.cast_spell_time = world.world_time
+            if ui.cast_spell_kind == "C":
+                ui.add_text_append(" Confusion")
+            else:
+                ui.add_text_append(repr(inp) + ',')
+                ui.add_text_append(" Cancelled")
+                ui.cast_spell_state = models.SpellState.NONE
         elif inp in self.movement_map:
             if self.waiting_open_direction:
                 ui.add_text_append(make_direction(**self.movement_map[inp]))
@@ -599,6 +636,9 @@ class UInterface(object):#
         elif inp == "X":
             # e'X'it ship or unmount horse
             world.exit_ship_or_unmount_horse(ui)
+        elif inp == "C":
+            ui.cast_spell_state = models.SpellState.WAIT_FOR_SPELL
+            ui.add_text("Cast?")
         # todo move into tile_svc
         elif inp == "\x17":  # Control-W
             world.wizard_mode = not world.wizard_mode
@@ -606,7 +646,7 @@ class UInterface(object):#
             ui.add_text(f"Wizard mode {_enabled}")
         elif inp and world.wizard_mode:
             # keys for wizards !
-            if inp == "C":
+            if inp == "1":
                 world.clipping = not world.clipping
                 _enabled = {"enabled" if world.clipping else "disabled"}
                 ui.add_text(f"Clipping mode {_enabled}")
@@ -657,7 +697,7 @@ class UInterface(object):#
 
         # Ultima IV is cruel, if *anything* happens it drives the game forward!!
         if any(flag.is_set() for flag in self.dirty_flags.values()):
-            world.tick()
+            world.tick(ui)
             self.time_monotonic_last_action = time.monotonic()
 
         # the cursor is always animated if the main game loop is running
@@ -708,6 +748,9 @@ class UInterface(object):#
             "tileset": self.tile_svc.tile_filename,
             "radius": self.radius,
             "darkness": self.darkness,
+            **{f"confusion": repr(self.confusion)},
+            **{f"spell_state": repr(self.cast_spell_state)},
+            **{f"spell_kind": repr(self.cast_spell_kind)},
         }
 
 
@@ -816,11 +859,12 @@ class UInterface(object):#
             # Does this belong in TileService ?
             output_text = ''
             items_by_row = viewport.items_in_view_by_row(world, ui=self)
+            inverse = True if self.cast_spell_state == models.SpellState.BEGIN_SPELL else False
             for cell_row, cell_items in enumerate(items_by_row):
                 ypos = cell_row * self.tile_svc.tile_height
                 for cell_number, items in enumerate(cell_items):
                     xpos = cell_number * self.tile_svc.tile_width
-                    tile_ans = self.tile_svc.make_ansi_tile(items, world.player_pos, self.darkness)
+                    tile_ans = self.tile_svc.make_ansi_tile(items, world.player_pos, self.darkness, self.confusion, inverse)
                     if self.dirty_flags['screen'].is_set() or tile_ans != self.tile_output_buffer.get((ypos, xpos)):
                         self.tile_output_buffer[(ypos, xpos)] = tile_ans
                         actual_xpos = xpos + viewport.xoffset
@@ -1079,9 +1123,13 @@ def init_begin_world(world_data):
 
     # Add test boat!
     world[(110, 86)].append(models.Item.create_boat(models.Position(y=110, x=86)))
-    return world
 
-    # and a horse, balloon, whirlpool,
+    # And a horse!
+    world[(106, 84)].append(models.Item.create_horse(models.Position(y=100, x=86)))
+
+    # And a balloon !!
+    world[(106, 87)].append(models.Item.create_balloon(models.Position(y=100, x=86)))
+    return world
 
 
 def main():

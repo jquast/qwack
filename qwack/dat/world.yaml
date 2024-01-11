@@ -625,6 +625,7 @@ World:
         Portals:
                 # XXX Luke's computer shop hidden in the grass!!!
                 - { "y": 106, "x": 88, "z": 0, "start_x": 11, "start_y": 16, "start_z": 0, "dest_id":  -99 }
+
                 # XXX Pharoah "BOB"
                 - { "y": 106, "x": 84, "z": 0, "start_x": 3, "start_y": 10, "start_z": 0, "dest_id":  -98 }
 

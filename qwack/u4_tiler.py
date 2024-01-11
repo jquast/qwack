@@ -226,7 +226,7 @@ class TileService:
                                     inverse=inverse,
                                     data_source='char')
 
-    def make_ansi_tile(self, items, player_pos, darkness):
+    def make_ansi_tile(self, items, player_pos, darkness, confusion, inverse):
         # TODO: move all this logic into an ItemCollection.render_ansi()
         # and Maps should be [Y,X] array of ItemCollections
         if len(items) < 1 or any(i.is_void for i in items) or darkness > MAX_DARKNESS:
@@ -239,7 +239,7 @@ class TileService:
         bg_tile_id = None
         if items[0].composite and len(items) > 1:
             bg_tile_id = items[-1].tile_id
-        y_offset_fg, y_offset_bg = 0, 0
+        y_offset_fg, y_offset_bg, x_offset_bg, x_offset_fg = 0, 0, 0, 0
         if items[0].is_field:
             y_offset_fg = items[0].get_y_offset(tick=int(time.monotonic() * 4))
         if items[-1].is_water:
@@ -247,6 +247,18 @@ class TileService:
                 y_offset_bg = items[-1].get_y_offset(tick=int(time.monotonic() * 4))
             else:
                 y_offset_fg = items[-1].get_y_offset(tick=int(time.monotonic() * 4))
+        if confusion:
+            if len(items) > 1:
+                y_offset_bg += sum((random.randrange(-1, 1), random.randrange(-1, 1),
+                                    random.randrange(-1, 1), random.randrange(-1, 1))) 
+                x_offset_bg += sum((random.randrange(-1, 1), random.randrange(-1, 1),
+                                    random.randrange(-1, 1), random.randrange(-1, 1))) 
+            else:
+                y_offset_fg += sum((random.randrange(-1, 1), random.randrange(-1, 1),
+                                    random.randrange(-1, 1), random.randrange(-1, 1)))
+                x_offset_fg += sum((random.randrange(-1, 1), random.randrange(-1, 1),
+                                    random.randrange(-1, 1), random.randrange(-1, 1)))
+
 
         # TODO: may require 'ui', or maybe just party.effects,
         # and work.tick/time_of_dat for game state, to implement,
@@ -261,8 +273,10 @@ class TileService:
                                    tile_height=self.tile_height,
                                    tile_darkness=tile_darkness,
                                    y_offset_bg=y_offset_bg,
+                                   x_offset_bg=x_offset_bg,
                                    y_offset_fg=y_offset_fg,
-                                   inverse=False)
+                                   x_offset_fg=x_offset_fg,
+                                   inverse=inverse)
 
 
     @functools.lru_cache(maxsize=256)
@@ -295,7 +309,6 @@ class TileService:
             ref_image = apply_composite(bg_image, fg_image)
         if inverse:
             ref_image = apply_inverse(ref_image)
-        ref_image = ref_image
         val = self.make_ansi_text_from_image(ref_image, tile_width, tile_height)
         self.save_disk_cache(tile_id, bg_tile_id, tile_filename, tile_width, tile_height,
                              tile_darkness, x_offset_bg, y_offset_bg,
