@@ -7,16 +7,16 @@ HERE = os.path.dirname(__file__)
 
 setuptools.setup(
     name='qwack',
-    version='0.0.3',
+    version='0.0.9',
     install_requires=['pyyaml', 'blessed'],
     long_description=open(os.path.join(HERE, 'README.rst')).read(),
     description='a rogue-like game of mysterious origins!',
     author='Jeff Quast',
     author_email='contact@jeffquast.com',
     license='MIT',
-    packages=['qwack'],
-    # just add the tilesets and world.yaml so far ..
-    package_data={"dat": ["*.zip", "*.yaml"]},
+    packages=['qwack', 'qwack.dat'],
+    # just add the tilesets and world.yaml for now ..
+    package_data={"dat": ["*.zip", "*.yaml", "*.ULT", "*.MAP"]},
     url='https://github.com/jquast/qwack',
     include_package_data=True,
     zip_safe=True,
