@@ -1,0 +1,2 @@
+include qwack/dat/*.zip qwack/dat/world.yaml qwack/dat/WORLD.MAP qwack/dat/*.ULT qwack/dat/*.ega qwack/dat/*.VGA qwack/dat/*.pal qwack/*.zip
+include qwack/*.py
