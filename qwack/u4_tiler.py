@@ -50,7 +50,7 @@ CHAFA_BIN = os.path.join(
     os.path.dirname(__file__), os.pardir, os.pardir, "chafa", "tools", "chafa", "chafa"
 )
 CHAFA_TRIM_START = len("\x1b[?25l\x1b[0m")
-CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1", "--font-ratio=9/16"]
+CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1", "--font-ratio=9/16", "--format=symbols"]
 
 TILESET_CACHE_ZIP = os.path.join(os.path.dirname(__file__), "tileset_cache.zip")
 TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a')
@@ -483,3 +483,12 @@ def load_charset(charset_record):
         assert charset_record["mode"].upper() == "VGA"
         load_fn = functools.partial(load_shapes_vga, height=8, width=8)
     return load_fn(charset_record["filename"])
+
+
+#if __name__ == '__main__':
+#    charset_record = {
+#        "mode": "vga",
+#        "filename": "u7_fonts.vga",
+#        "description": "Ultima7 blackgate font"
+#    }
+#    assert False, load_charset(charset_record)
