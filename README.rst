@@ -5,7 +5,14 @@ qwack: a quickly written hack_ (1985) variant for Python.
 
 .. _hack: https://en.wikipedia.org/wiki/Hack_%28Unix_video_game%29
 
+Running
+=======
 
+pip install qwack
+qwack
+
+.. note:: this requires a very large terminal size, eg.  XXXX lines and YYYY
+   columns, adjust window and font size accordingly.
 
 Keyboard Controls
 -----------------
@@ -31,8 +38,9 @@ Actions (ultima 4 style):
 - ``B`` Board ship/mount horse
 - ``X`` eXit ship/unmount horse
 - ``C`` Cast spell
-    - Only one spell available, press ``C`` again for confusion
-    - requires 'chafa' to be installed
+
+  - Only one spell available, press ``C`` again for confusion
+  - requires 'chafa' to be installed, see below
 
 
 Wizard Mode, enabled by default (``Ctrl-W`` to toggle):
