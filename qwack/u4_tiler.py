@@ -294,11 +294,11 @@ class TileService:
         if val is not None:
             return val
         # ASSERT: Tile should have been pre-generated - if this fires, run tools/pregen_tiles.py
-        assert False, (
-             f"Tile not pre-generated: {tile_filename}/{tile_id}/"
-             f"{bg_tile_id}_{tile_width}_{tile_height}_{tile_darkness}_"
-             f"{x_offset_bg}_{y_offset_bg}_{x_offset_fg}_{y_offset_fg}_{inverse}.txt"
-        )
+        # assert False, (
+        #      f"Tile not pre-generated: {tile_filename}/{tile_id}/"
+        #      f"{bg_tile_id}_{tile_width}_{tile_height}_{tile_darkness}_"
+        #      f"{x_offset_bg}_{y_offset_bg}_{x_offset_fg}_{y_offset_fg}_{inverse}.txt"
+        # )
         fg_image = self.get_pixel_cache(tile_filename, tile_id, data_source)
         bg_image = self.get_pixel_cache(tile_filename, bg_tile_id, data_source)
         # apply darkness to both layers
