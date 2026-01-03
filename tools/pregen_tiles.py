@@ -563,6 +563,8 @@ def main():
     parser.add_argument("--show-props", action="store_true", help="Show extracted tile properties")
     parser.add_argument("--default-sizes", action="store_true",
                         help="Only generate default tile/char sizes (16 and 8)")
+    parser.add_argument("--no-confusion", action="store_true",
+                        help="Skip confusion spell offset tiles")
     args = parser.parse_args()
 
     # Show tile properties if requested
@@ -637,7 +639,7 @@ def main():
                 if args.regenerate or spec.cache_key not in existing_keys:
                     all_tile_specs.append((spec, tileset))
 
-        if args.type in ("confusion", "all"):
+        if args.type in ("confusion", "all") and not args.no_confusion:
             for spec in enumerate_confusion_tiles(tileset_filename):
                 if args.regenerate or spec.cache_key not in existing_keys:
                     all_tile_specs.append((spec, tileset))
