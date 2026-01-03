@@ -46,14 +46,12 @@ EGA2RGB = [
 
 # XXX Chafa is great, but we need to pre-render *everything* so that we can avoid it
 # as a dependency if we want to distribute this with 'pip' ..
-CHAFA_BIN = os.path.join(
-    os.path.dirname(__file__), os.pardir, os.pardir, "chafa", "tools", "chafa", "chafa"
-)
+CHAFA_BIN = os.getenv('CHAFA_BIN', '/usr/local/bin/chafa')
 CHAFA_TRIM_START = len("\x1b[?25l\x1b[0m")
 CHAFA_EXTRA_ARGS = ["-w", "1", "-O", "1", "--font-ratio=9/16", "--format=symbols"]
 
 TILESET_CACHE_ZIP = os.path.join(os.path.dirname(__file__), "tileset_cache.zip")
-TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a')
+TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a', compression=zipfile.ZIP_DEFLATED, compresslevel=9)
 
 # todo: make a Shapes class, of course!
 # Just init a new Shapes class for each tileset, and then call get_tile() on it.
@@ -231,7 +229,7 @@ class TileService:
         # and Maps should be [Y,X] array of ItemCollections
         if len(items) < 1 or any(i.is_void for i in items) or darkness > MAX_DARKNESS:
             # speedy performance hack for blank tiles
-            return [f"\x1b[0m{(" " * self.tile_width)}"] * self.tile_height
+            return [f"\x1b[0m{(' ' * self.tile_width)}"] * self.tile_height
 
         # it would be better if items were always in sorted order !!
         items.sort(key=lambda i: i.sort_value, reverse=True)
@@ -295,6 +293,12 @@ class TileService:
                                        x_offset_fg, y_offset_fg, inverse)
         if val is not None:
             return val
+        # ASSERT: Tile should have been pre-generated - if this fires, run tools/pregen_tiles.py
+        assert False, (
+             f"Tile not pre-generated: {tile_filename}/{tile_id}/"
+             f"{bg_tile_id}_{tile_width}_{tile_height}_{tile_darkness}_"
+             f"{x_offset_bg}_{y_offset_bg}_{x_offset_fg}_{y_offset_fg}_{inverse}.txt"
+        )
         fg_image = self.get_pixel_cache(tile_filename, tile_id, data_source)
         bg_image = self.get_pixel_cache(tile_filename, bg_tile_id, data_source)
         # apply darkness to both layers
@@ -337,7 +341,7 @@ class TileService:
         global TILESET_FP
         if TILESET_FP.mode != 'a':
             TILESET_FP.close()
-            TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a')
+            TILESET_FP = zipfile.ZipFile(TILESET_CACHE_ZIP, 'a', compression=zipfile.ZIP_DEFLATED, compresslevel=9)
         diskcache_fname = os.path.join(
             f'{tile_filename}',
             f'{tile_id}',
