@@ -329,7 +329,7 @@ class World(dict):
         elif line_inp in ui.talk_npc.talk_data['prompts']:
             ui.add_text(ui.talk_npc.talk_data['prompts'][line_inp])
         elif not line_inp or line_inp in ('BYE', 'THAN'):
-            ui.add_text(f"{ui.talk_npc.talk_data["pronoun"]} says: Bye.")
+            ui.add_text(f"{ui.talk_npc.talk_data['pronoun']} says: Bye.")
             ui.talk_npc = None
             return
         elif line_inp == 'Z' and self.wizard_mode:
