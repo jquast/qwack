@@ -8,7 +8,7 @@ qwack: a quickly written hack_ (1985) variant for Python.
 Running
 =======
 
-pip install qwack
+pip install git+https://github.com/jquast/qwack.git
 qwack
 
 .. note:: this requires a very large terminal size, eg. 450 lines and 121
