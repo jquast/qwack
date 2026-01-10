@@ -13,8 +13,8 @@ Running
     pip install git+https://github.com/jquast/qwack.git
     qwack
 
-.. note:: this requires a very large terminal size, eg. 450 lines and 121
-   columns, adjust window and font size accordingly.
+Note: this requires a very large terminal size, eg. 450 lines and 121
+columns, adjust window and font size accordingly.
 
 Keyboard Controls
 -----------------
